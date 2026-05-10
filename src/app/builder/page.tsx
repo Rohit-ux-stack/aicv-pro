@@ -371,10 +371,10 @@ export default function BuilderPage() {
                 {step === 1 && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {renderInput({ label: 'Full Name', value: data.personalInfo.fullName, onChange: (v) => updateData('personalInfo', { fullName: v }), placeholder: 'Jane Doe' })}
-                      {renderInput({ label: 'Email Address', value: data.personalInfo.email, onChange: (v) => updateData('personalInfo', { email: v }), placeholder: 'jane@email.com' })}
-                      {renderInput({ label: 'Phone Number', value: data.personalInfo.phone, onChange: (v) => updateData('personalInfo', { phone: v }), placeholder: '+91 00000 00000' })}
-                      {renderInput({ label: 'Location', value: data.personalInfo.location, onChange: (v) => updateData('personalInfo', { location: v }), placeholder: 'Mumbai, India' })}
+                      {renderInput({ label: 'Full Name', value: data.personalInfo.fullName, onChange: (v) => updateData('personalInfo', { fullName: v }), placeholder: 'full name' })}
+                      {renderInput({ label: 'Email Address', value: data.personalInfo.email, onChange: (v) => updateData('personalInfo', { email: v }), placeholder: 'email id' })}
+                      {renderInput({ label: 'Phone Number', value: data.personalInfo.phone, onChange: (v) => updateData('personalInfo', { phone: v }), placeholder: 'phone number' })}
+                      {renderInput({ label: 'Location', value: data.personalInfo.location, onChange: (v) => updateData('personalInfo', { location: v }), placeholder: 'location' })}
                       {renderInput({ label: 'LinkedIn Profile', value: data.personalInfo.linkedin, onChange: (v) => updateData('personalInfo', { linkedin: v }), placeholder: 'linkedin.com/in/username' })}
                       {renderInput({ label: 'GitHub / Portfolio', value: data.personalInfo.github, onChange: (v) => updateData('personalInfo', { github: v }), placeholder: 'github.com/username' })}
                     </div>
@@ -382,7 +382,7 @@ export default function BuilderPage() {
                       <label className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-300">
                         <Briefcase className="h-3.5 w-3.5" /> Target Job Profile
                       </label>
-                      <SmartTagInput tags={data.personalInfo.website ? data.personalInfo.website.split(',').filter(Boolean) : []} placeholder="e.g. Full Stack Developer, UI Designer…" onChange={(tags) => updateData('personalInfo', { website: tags.join(',') })} />
+                      <SmartTagInput tags={data.personalInfo.website ? data.personalInfo.website.split(',').filter(Boolean) : []} placeholder="Full Stack Developer, Professor" onChange={(tags) => updateData('personalInfo', { website: tags.join(',') })} />
                       <p className="mt-2.5 text-[11px] font-medium text-amber-300/50">✦ Used to tailor ATS keywords to your target roles. Be specific.</p>
                     </div>
                   </div>
@@ -397,10 +397,10 @@ export default function BuilderPage() {
                           <motion.div key={edu.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
                             {deleteBtn(() => removeArrayItem('education', edu.id))}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0">
-                              {renderInput({ label: 'Degree / Qualification', value: edu.degree, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, degree: v } : i)), placeholder: 'B.Tech Computer Science' })}
-                              {renderInput({ label: 'College / University', value: edu.institution, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, institution: v } : i)), placeholder: 'Institution name' })}
-                              {renderInput({ label: 'Duration', value: edu.duration, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, duration: v } : i)), placeholder: 'Aug 2020 – May 2024' })}
-                              {renderInput({ label: 'Grade / GPA', value: edu.grade, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, grade: v } : i)), placeholder: '9.0 CGPA / 85%' })}
+                              {renderInput({ label: 'Degree / Qualification', value: edu.degree, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, degree: v } : i)), placeholder: 'Degree / Qualification' })}
+                              {renderInput({ label: 'College / University', value: edu.institution, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, institution: v } : i)), placeholder: 'College / University' })}
+                              {renderInput({ label: 'Duration', value: edu.duration, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
+                              {renderInput({ label: 'Grade / GPA', value: edu.grade, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, grade: v } : i)), placeholder: 'Grade / GPA' })}
                             </div>
                           </motion.div>
                         ))}
@@ -415,7 +415,7 @@ export default function BuilderPage() {
                       <h2 className="text-2xl sm:text-3xl font-extrabold text-white">Skills &amp; Languages</h2>
                       <p className="mt-1 text-sm font-medium text-violet-300/70">Press Enter or comma to add each tag.</p>
                     </div>
-                    {([{ key: 'technical', label: 'Technical Skills', placeholder: 'JavaScript, Python, React, SQL…' }, { key: 'tools', label: 'Tools & Frameworks', placeholder: 'Figma, Docker, VS Code, Next.js…' }, { key: 'soft', label: 'Soft Skills', placeholder: 'Leadership, Agile, Communication…' }, { key: 'languages', label: 'Languages', placeholder: 'English, Hindi, Marathi…' }] as { key: keyof typeof data.skills; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
+                    {([{ key: 'technical', label: 'Technical Skills', placeholder: 'JavaScript, Excel' }, { key: 'tools', label: 'Tools & Frameworks', placeholder: 'Figma, Docker, VS Code, Excel, etc' }, { key: 'soft', label: 'Soft Skills', placeholder: 'Leadership, Agile, Communication, etc.' }, { key: 'languages', label: 'Languages', placeholder: 'English, Hindi, Marathi…' }] as { key: keyof typeof data.skills; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
                       <div key={key} className="space-y-2">
                         <label className="ml-1 text-xs font-bold uppercase tracking-widest text-violet-200">{label} {['soft', 'languages'].includes(key) && <span className="text-red-400">*</span>}</label>
                         <SmartTagInput tags={(data.skills as Record<string, string>)[key] ? (data.skills as Record<string, string>)[key].split(',').filter(Boolean) : []} placeholder={placeholder} onChange={(tags) => updateData('skills', { [key]: tags.join(',') })} />
@@ -433,9 +433,9 @@ export default function BuilderPage() {
                           <motion.div key={exp.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
                             {deleteBtn(() => removeArrayItem('experience', exp.id))}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
-                              {renderInput({ label: 'Job Title', value: exp.title, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, title: v } : i)), placeholder: 'Frontend Engineer' })}
+                              {renderInput({ label: 'Job Title', value: exp.title, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, title: v } : i)), placeholder: 'Previous Job Role' })}
                               {renderInput({ label: 'Company', value: exp.company, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, company: v } : i)), placeholder: 'Company name' })}
-                              {renderInput({ label: 'Duration', value: exp.duration, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, duration: v } : i)), placeholder: 'Jan 2023 – Present' })}
+                              {renderInput({ label: 'Duration', value: exp.duration, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
                             </div>
                             {renderInput({ label: 'Responsibilities & Achievements', value: exp.responsibilities, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, responsibilities: v } : i)), placeholder: 'Describe key achievements and measurable impact…', isTextarea: true, section: 'experience', id: exp.id, field: 'responsibilities' })}
                           </motion.div>
@@ -454,8 +454,8 @@ export default function BuilderPage() {
                           <motion.div key={proj.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
                             {deleteBtn(() => removeArrayItem('projects', proj.id))}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
-                              {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'E-commerce Platform' })}
-                              {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'Next.js, MongoDB, Tailwind' })}
+                              {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'Project name' })}
+                              {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'technology used' })}
                             </div>
                             {renderInput({ label: 'Description & Impact', value: proj.description, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, description: v } : i)), placeholder: 'What problem did you solve? What was the outcome?', isTextarea: true, section: 'projects', id: proj.id, field: 'description' })}
                           </motion.div>
