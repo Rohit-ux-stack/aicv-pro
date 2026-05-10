@@ -2,58 +2,116 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+// --- Animation Variants ---
+const fadeUpVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { duration: 0.6, type: 'tween' as const, ease: 'easeOut' as const } 
+  }
+};
 
 export default function PrivacyPage() {
   return (
-    <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col px-6 py-12">
-      <div className="pointer-events-none absolute top-[-10%] right-[-10%] h-[400px] w-[400px] rounded-full bg-emerald-600/10 blur-[120px]" />
+    <div 
+      className="relative flex min-h-screen w-full flex-col items-center px-4 py-8 sm:px-6 sm:py-12 overflow-hidden font-sans"
+      style={{ background: 'radial-gradient(ellipse at 20% 0%, #1e0a3c 0%, #0a0a12 60%, #000000 100%)' }}
+    >
+      {/* Background glow orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 2, ease: "easeOut" }}
+          className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-violet-600/15 blur-[120px]" 
+        />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 2, delay: 0.5, ease: "easeOut" }}
+          className="absolute top-1/2 -right-40 h-[400px] w-[400px] rounded-full bg-indigo-600/10 blur-[120px]" 
+        />
+      </div>
 
-      <div className="mb-8">
-        <Link href="/builder">
-          <Button variant="ghost" className="text-slate-400 hover:text-white px-0">
+      {/* Back Button Container */}
+      <div className="w-full max-w-3xl mb-6 relative z-20">
+        <Link href="/">
+          <Button variant="ghost" className="text-violet-300 hover:text-white hover:bg-violet-500/20 transition-all px-4 py-2 rounded-xl">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Builder
           </Button>
         </Link>
       </div>
 
-      <div className="glass-card z-10 w-full rounded-[2rem] border border-white/5 bg-black/40 p-8 md:p-12 shadow-2xl text-emerald-100/70 space-y-6">
-        <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-8">
-          <div className="p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-            <ShieldCheck className="w-8 h-8 text-emerald-400" />
+      {/* Main Content Card */}
+      <motion.div 
+        variants={fadeUpVariants}
+        initial="hidden"
+        animate="visible"
+        className="glass-card relative z-10 w-full max-w-3xl rounded-[2rem] sm:rounded-[2.5rem] border border-violet-400/20 bg-black/50 p-6 sm:p-8 md:p-12 shadow-2xl shadow-violet-950/50 backdrop-blur-2xl text-violet-100/80 space-y-6 sm:space-y-8"
+      >
+        {/* subtle inner top highlight */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[2.5rem] bg-gradient-to-r from-transparent via-violet-400/30 to-transparent" />
+
+        {/* Brand indicator */}
+        <div className="inline-flex items-center gap-2 mb-2">
+          <div className="flex h-6 w-6 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/50">
+            <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+          </div>
+          <span className="text-sm sm:text-base font-black tracking-tight text-white">
+            AICV<span className="text-violet-400">-Pro</span>
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-6 border-b border-violet-500/20 pb-8">
+          <div className="flex-shrink-0 inline-flex p-3 sm:p-4 bg-violet-500/10 rounded-2xl border border-violet-500/20 w-fit">
+            <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-violet-400" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white">Privacy Policy</h1>
-            <p className="text-sm mt-1">Last updated: {new Date().toLocaleDateString()}</p>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight drop-shadow-sm">Privacy Policy</h1>
+            <p className="text-xs sm:text-sm mt-2 text-violet-300/60 font-medium">Last updated: {new Date().toLocaleDateString()}</p>
           </div>
         </div>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold text-emerald-400">1. Data Storage (Local First)</h2>
-          <p>At AI Resume Pro, your privacy is our priority. We do <strong>not</strong> store your personal resume data on our servers. All data entered into the resume builder is saved strictly in your browser's Local Storage. If you clear your browser data or do not use the app for 15 minutes, your resume data is permanently deleted from your device.</p>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-violet-300">1. Data Storage (Local First)</h2>
+          <p className="leading-relaxed text-sm sm:text-base">
+            At AICV-Pro, your privacy is our priority. We do <strong>not</strong> store your personal resume data on our servers. All data entered into the resume builder is saved strictly in your browser's Local Storage. If you clear your browser data or do not use the app for 15 minutes, your resume data is permanently deleted from your device to ensure security.
+          </p>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold text-emerald-400">2. AI Processing</h2>
-          <p>When you use features like "AI Autofill" from a PDF or "AI Write for Me", the text is sent securely to our third-party AI provider (e.g., OpenAI) solely for the purpose of generating your summary or extracting data. This data is not used to train global AI models and is discarded after processing.</p>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-violet-300">2. AI Processing</h2>
+          <p className="leading-relaxed text-sm sm:text-base">
+            When you use features like "AI Autofill" from a PDF or "AI Write for Me", the text is sent securely to our third-party AI provider solely for the purpose of generating your summary or extracting data. This data is not used to train global AI models and is discarded immediately after processing.
+          </p>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold text-emerald-400">3. Analytics & Cookies</h2>
-          <p>We may use minimal analytics to understand how our tool is used (e.g., page views, error tracking) to improve the experience. We do not use tracking cookies for advertising purposes.</p>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-violet-300">3. Analytics & Cookies</h2>
+          <p className="leading-relaxed text-sm sm:text-base">
+            We may use minimal, anonymous analytics to understand how our tool is used (e.g., page views, error tracking) to improve the user experience. We do not use tracking cookies for advertising or marketing purposes.
+          </p>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold text-emerald-400">4. Third-Party Services</h2>
-          <p>Your resume is generated natively in your browser using React-PDF. The PDF never touches a server during the final generation phase, ensuring your downloaded file remains entirely private.</p>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-violet-300">4. Third-Party Services</h2>
+          <p className="leading-relaxed text-sm sm:text-base">
+            Your resume is generated natively in your browser using secure rendering libraries. The PDF document itself never touches a server during the final generation phase, ensuring your downloaded file remains entirely private to your machine.
+          </p>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold text-emerald-400">5. Contact</h2>
-          <p>If you have any questions regarding how your data is handled, please contact the developer.</p>
+        <section className="space-y-3 sm:space-y-4">
+          <h2 className="text-xl sm:text-2xl font-bold text-violet-300">5. Contact</h2>
+          <p className="leading-relaxed text-sm sm:text-base">
+            If you have any questions regarding how your data is handled, please contact the developer at <a href="mailto:rohitbanerjee847@gmail.com" className="text-violet-400 hover:text-violet-300 underline decoration-violet-500/40 underline-offset-4">rohitbanerjee847@gmail.com</a>.
+          </p>
         </section>
-      </div>
+      </motion.div>
     </div>
   );
 }
