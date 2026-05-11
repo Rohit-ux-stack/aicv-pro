@@ -371,12 +371,12 @@ export default function BuilderPage() {
                 {step === 1 && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      {renderInput({ label: 'Full Name', value: data.personalInfo.fullName, onChange: (v) => updateData('personalInfo', { fullName: v }), placeholder: 'full name' })}
-                      {renderInput({ label: 'Email Address', value: data.personalInfo.email, onChange: (v) => updateData('personalInfo', { email: v }), placeholder: 'email id' })}
-                      {renderInput({ label: 'Phone Number', value: data.personalInfo.phone, onChange: (v) => updateData('personalInfo', { phone: v }), placeholder: 'phone number' })}
-                      {renderInput({ label: 'Location', value: data.personalInfo.location, onChange: (v) => updateData('personalInfo', { location: v }), placeholder: 'location' })}
-                      {renderInput({ label: 'LinkedIn Profile', value: data.personalInfo.linkedin, onChange: (v) => updateData('personalInfo', { linkedin: v }), placeholder: 'linkedin.com/in/username' })}
-                      {renderInput({ label: 'GitHub / Portfolio', value: data.personalInfo.github, onChange: (v) => updateData('personalInfo', { github: v }), placeholder: 'github.com/username' })}
+                      {renderInput({ label: 'Full Name', value: data.personalInfo.fullName, onChange: (v) => updateData('personalInfo', { fullName: v }), placeholder: 'Full name' })}
+                      {renderInput({ label: 'Email Address', value: data.personalInfo.email, onChange: (v) => updateData('personalInfo', { email: v }), placeholder: 'Email id' })}
+                      {renderInput({ label: 'Phone Number', value: data.personalInfo.phone, onChange: (v) => updateData('personalInfo', { phone: v }), placeholder: 'Phone number' })}
+                      {renderInput({ label: 'Location', value: data.personalInfo.location, onChange: (v) => updateData('personalInfo', { location: v }), placeholder: 'Location' })}
+                      {renderInput({ label: 'LinkedIn Profile', value: data.personalInfo.linkedin, onChange: (v) => updateData('personalInfo', { linkedin: v }), placeholder: 'Linkedin.com/in/username' })}
+                      {renderInput({ label: 'GitHub / Portfolio', value: data.personalInfo.github, onChange: (v) => updateData('personalInfo', { github: v }), placeholder: 'Github.com/username' })}
                     </div>
                     <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-4 sm:p-5">
                       <label className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-300">
