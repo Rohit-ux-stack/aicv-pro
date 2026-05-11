@@ -94,8 +94,8 @@ export default function BuilderPage() {
   // ── Validation Logic ──────────────────────────────────────────────────────
   const checkValidation = () => {
     if (step === 1) {
-      if (!data.personalInfo.fullName?.trim() || !data.personalInfo.phone?.trim()) {
-        return { isValid: false, message: 'Full Name and Phone Number are required.' };
+      if (!data.personalInfo.fullName?.trim() || !data.personalInfo.phone?.trim() || !data.personalInfo.location?.trim()) {
+        return { isValid: false, message: 'Full Name, Phone Number, and Location are required.' };
       }
     }
     if (step === 2) {
@@ -211,7 +211,7 @@ export default function BuilderPage() {
     <div className="relative w-full space-y-1.5 group">
       <div className="flex items-center justify-between">
         <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">
-          {label} {['Full Name', 'Phone Number', 'Degree / Qualification', 'Soft Skills', 'Languages'].includes(label) && <span className="text-red-400">*</span>}
+          {label} {['Full Name', 'Phone Number', 'Location', 'Degree / Qualification', 'Soft Skills', 'Languages'].includes(label) && <span className="text-red-400">*</span>}
         </label>
         {isTextarea && (
           <button
