@@ -17,6 +17,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'AICV-Pro | Free AI Resume Builder & ATS Optimizer',
   description: 'Build a professional, ATS-friendly resume in minutes. Upload your PDF or start from scratch. Free AI summary writer and ATS keyword optimization for software engineers and freshers.',
+  // ── ADD THESE LINES ────────────────
+  applicationName: 'AICV-Pro',
+  appleWebApp: {
+    title: 'AICV-Pro',
+  },
+  openGraph: {
+    siteName: 'AICV-Pro',
+    type: 'website',
+  },
+  // ───────────────────────────────────
   keywords: [
   // ── Core Product ──────────────────────────────────────────────
   'AI resume builder',
