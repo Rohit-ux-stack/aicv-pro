@@ -145,7 +145,7 @@ export const metadata: Metadata = {
 ],
   authors: [{ name: 'Rohit Somnath Banerjee' }],
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.png',
   },
   verification: {
     google: 'WMT0_6q4Ff3F92BeOO7ySYhPZPywnlQeB_FJLD8weo8', // Keeping your verification code safe!
