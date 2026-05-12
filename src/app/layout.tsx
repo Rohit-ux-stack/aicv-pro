@@ -27,7 +27,9 @@ export const metadata: Metadata = {
   'professional resume builder',
   'resume creator online',
   'best resume builder 2025',
+  'best resume builder 2026',
   'AICV Pro',
+  'AI CV Pro',
 
   // ── ATS Specific ──────────────────────────────────────────────
   'ATS friendly resume',
