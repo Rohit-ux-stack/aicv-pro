@@ -150,6 +150,9 @@ export const metadata: Metadata = {
   verification: {
     google: 'WMT0_6q4Ff3F92BeOO7ySYhPZPywnlQeB_FJLD8weo8', // Keeping your verification code safe!
   },
+  other: {
+      'google-adsense-account': ['ca-pub-6230488838064363'],
+    },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
