@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     const parsed = JSON.parse(raw);
     return NextResponse.json({ data: parsed });
 
-  } catch (error) {
+    } catch (error) {
     console.error('--- PDF PARSING ERROR ---', error);
     return NextResponse.json({ error: 'Failed to parse resume.' }, { status: 500 });
   }
