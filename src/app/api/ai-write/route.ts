@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     // 5. Call Groq
     const result = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7, // Increased from 0.4 to 0.7 to allow for more vocabulary variation while obeying the strict rules
     });
