@@ -68,7 +68,7 @@ export async function POST(req: Request) {
             ]
           }
         ],
-        model: "qwen/qwen3.6-27b",, 
+        model: "qwen/qwen3.6-27b", 
         temperature: 0.1,
         response_format: { type: "json_object" }
       });
