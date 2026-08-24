@@ -16,6 +16,11 @@ import { Button } from '@/components/ui/button';
 import { SmartTagInput } from '@/components/ui/SmartTagInput';
 import { ResumePDF } from '@/components/builder/ResumePDF';
 
+// Dnd Kit Imports
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableProjectItem } from '@/components/builder/SortableProjectItem';
+
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
   { ssr: false }
@@ -104,7 +109,25 @@ export default function BuilderPage() {
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data, updateData, addArrayItem, removeArrayItem, loadFullData } = useResume();
+  const { data, updateData, addArrayItem, removeArrayItem, reorderArrayItem, loadFullData } = useResume();
+
+  // ── Drag & Drop Sensors & Handlers ────────────────────────────────────────
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over.id) {
+      const oldIndex = data.projects.findIndex((proj: any) => proj.id === active.id);
+      const newIndex = data.projects.findIndex((proj: any) => proj.id === over.id);
+      reorderArrayItem('projects', oldIndex, newIndex); 
+    }
+  };
 
   // ── Validation Logic ──────────────────────────────────────────────────────
   const checkValidation = () => {
@@ -270,7 +293,7 @@ export default function BuilderPage() {
   );
 
   const deleteBtn = (onClick: () => void) => (
-    <button onClick={onClick} className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 transition-all hover:bg-red-500 hover:text-white hover:border-red-500">
+    <button onClick={onClick} className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 transition-all hover:bg-red-500 hover:text-white hover:border-red-500 z-10">
       <Trash2 className="h-3 w-3" /> Remove
     </button>
   );
@@ -554,18 +577,22 @@ export default function BuilderPage() {
                   <div className="space-y-5">
                     {data.projects.length === 0 ? emptyState('What have you built?', () => addArrayItem('projects', { name: '', stack: '', description: '' }), 'Add Your First Project') : <>
                       {sectionHeader('Projects', 'Highlight your best work.', () => addArrayItem('projects', { name: '', stack: '', description: '' }), 'Add Project')}
-                      <AnimatePresence>
-                        {data.projects.map((proj: any) => (
-                          <motion.div key={proj.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
-                            {deleteBtn(() => removeArrayItem('projects', proj.id))}
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
-                              {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'Project name' })}
-                              {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'technology used' })}
-                            </div>
-                            {renderInput({ label: 'Description & Impact', value: proj.description, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, description: v } : i)), placeholder: 'What problem did you solve? What was the outcome?', isTextarea: true, section: 'projects', id: proj.id, field: 'description' })}
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
+                      
+                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <SortableContext items={data.projects.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
+                          {data.projects.map((proj: any) => (
+                            <SortableProjectItem key={proj.id} id={proj.id}>
+                              {deleteBtn(() => removeArrayItem('projects', proj.id))}
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 sm:pt-0 mb-4">
+                                {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'Project name' })}
+                                {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'technology used' })}
+                              </div>
+                              {renderInput({ label: 'Description & Impact', value: proj.description, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, description: v } : i)), placeholder: 'What problem did you solve? What was the outcome?', isTextarea: true, section: 'projects', id: proj.id, field: 'description' })}
+                            </SortableProjectItem>
+                          ))}
+                        </SortableContext>
+                      </DndContext>
+                      
                     </>}
                   </div>
                 )}
