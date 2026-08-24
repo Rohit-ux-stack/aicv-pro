@@ -16,12 +16,7 @@ import { Button } from '@/components/ui/button';
 import { SmartTagInput } from '@/components/ui/SmartTagInput';
 import { ResumePDF } from '@/components/builder/ResumePDF';
 
-// Dnd Kit Imports
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { SortableProjectItem } from '@/components/builder/SortableProjectItem';
-
-// PDF Utilities for Smart Routing
+// 1. ADDED: New PDF Utils for Client-Side Parsing
 import { extractTextFromPdf, convertPdfAllPagesToImages } from '@/lib/pdfUtils';
 
 const PDFDownloadLink = dynamic(
@@ -32,21 +27,6 @@ const PDFViewer = dynamic(
   () => import('@react-pdf/renderer').then((mod) => mod.PDFViewer),
   { ssr: false }
 );
-
-// ---------------------------------------------------------------------------
-// Constants & Options
-// ---------------------------------------------------------------------------
-const months = [
-  { value: "1", label: "Jan" }, { value: "2", label: "Feb" }, 
-  { value: "3", label: "Mar" }, { value: "4", label: "Apr" },
-  { value: "5", label: "May" }, { value: "6", label: "Jun" },
-  { value: "7", label: "Jul" }, { value: "8", label: "Aug" },
-  { value: "9", label: "Sep" }, { value: "10", label: "Oct" },
-  { value: "11", label: "Nov" }, { value: "12", label: "Dec" }
-];
-
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 40 }, (_, i) => (currentYear + 5 - i).toString());
 
 // ---------------------------------------------------------------------------
 // Custom GitHub SVG Component
@@ -112,25 +92,7 @@ export default function BuilderPage() {
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data, updateData, addArrayItem, removeArrayItem, reorderArrayItem, loadFullData } = useResume();
-
-  // ── Drag & Drop Sensors & Handlers ────────────────────────────────────────
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event;
-
-    if (active.id !== over.id) {
-      const oldIndex = data.projects.findIndex((proj: any) => proj.id === active.id);
-      const newIndex = data.projects.findIndex((proj: any) => proj.id === over.id);
-      reorderArrayItem('projects', oldIndex, newIndex); 
-    }
-  };
+  const { data, updateData, addArrayItem, removeArrayItem, loadFullData } = useResume();
 
   // ── Validation Logic ──────────────────────────────────────────────────────
   const checkValidation = () => {
@@ -187,62 +149,71 @@ export default function BuilderPage() {
     finally { setIsAiLoading(false); }
   };
 
+  // 2. UPDATED: Smart File Processing Function
   const processFile = async (file: File) => {
     const isValidFile = file.type === 'application/pdf' || file.type.startsWith('image/');
-    
     if (!isValidFile) {
-      alert("Please upload a valid PDF or Image (PNG/JPG) document.");
+      alert("Please upload a valid PDF or Image document.");
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
       let payload = {};
 
       if (file.type.startsWith('image/')) {
-        // CASE 1: Direct Image Upload
         const reader = new FileReader();
         reader.readAsDataURL(file);
         await new Promise((resolve) => (reader.onload = resolve));
         payload = { type: 'image', images: [reader.result] };
       } 
       else if (file.type === 'application/pdf') {
-        // CASE 2: PDF Upload (Smart Check)
         const extractedText = await extractTextFromPdf(file);
         
-        // Agar text 50 characters se zyada hai, matlab readable PDF hai
-        if (extractedText.length > 50) {
-          console.log("Readable text found. Using fast text extraction.");
+        if (extractedText && extractedText.length > 50) {
           payload = { type: 'text', text: extractedText };
         } else {
-          // Agar text nahi mila, matlab scanned PDF (image) hai
-          console.log("No readable text. Converting PDF to images for OCR.");
+          // If text extraction fails (scanned PDF), use image conversion fallback
           const base64ImagesArray = await convertPdfAllPagesToImages(file);
           payload = { type: 'image', images: base64ImagesArray };
         }
       }
 
-      // Send payload to backend
-      const res = await fetch('/api/parse', {
+      const response = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
-      const result = await res.json();
 
-      // If data is successfully returned, load it into context
-      if (result && result.data) { 
-        loadFullData(result.data); 
-        setStep(1); 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || `Server returned ${response.status}`);
       }
-    } catch (error) { 
-      console.error("Parsing Error:", error);
-      alert('Parsing failed.'); 
-      setStep(1); 
-    } finally { 
-      setIsLoading(false); 
+      
+      const parsedData = await response.json();
+      if (parsedData.data) {
+        // Try parsing the string returned by AI to JSON if needed, or if API returns JSON string
+        try {
+          const jsonMatch = parsedData.data.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const finalData = JSON.parse(jsonMatch[0]);
+            loadFullData(finalData);
+          }
+        } catch (e) {
+          console.warn("Could not parse AI response as pure JSON. Ensure API returns proper structure.", e);
+        }
+        setStep(1);
+      } else {
+        throw new Error("No data received from API");
+      }
+
+    } catch (error: any) {
+      console.error("Upload Error:", error);
+      alert(`Could not process the document: ${error.message || 'Unknown error'}`);
+      setStep(1); // Proceed anyway to manual step
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -310,14 +281,14 @@ export default function BuilderPage() {
 
       {isTextarea ? (
         <textarea
-          value={value || ''}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="min-h-[108px] w-full resize-none rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] leading-relaxed text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
         />
       ) : (
         <input
-          value={value || ''}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
@@ -339,7 +310,7 @@ export default function BuilderPage() {
   );
 
   const deleteBtn = (onClick: () => void) => (
-    <button onClick={onClick} className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 transition-all hover:bg-red-500 hover:text-white hover:border-red-500 z-10">
+    <button onClick={onClick} className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-[11px] font-medium text-red-400 transition-all hover:bg-red-500 hover:text-white hover:border-red-500">
       <Trash2 className="h-3 w-3" /> Remove
     </button>
   );
@@ -387,7 +358,7 @@ export default function BuilderPage() {
               </div>
               <div className="space-y-3">
                 <h2 className="text-[clamp(2rem,6vw,3.5rem)] font-black tracking-tight text-white leading-[1.1]">Your resume,<br /><span className="bg-gradient-to-r from-violet-300 via-indigo-300 to-violet-400 bg-clip-text text-transparent">reinvented by AI</span></h2>
-                <p className="mx-auto max-w-lg text-base sm:text-lg text-violet-200/70 leading-relaxed font-medium">Upload a PDF or Image for instant AI extraction, or craft a polished, ATS-ready document from scratch in minutes.</p>
+                <p className="mx-auto max-w-lg text-base sm:text-lg text-violet-200/70 leading-relaxed font-medium">Upload a PDF for instant AI extraction, or craft a polished, ATS-ready document from scratch in minutes.</p>
               </div>
               <div className="mx-auto grid max-w-2xl grid-cols-1 gap-5 pt-4 sm:grid-cols-2">
                 
@@ -406,11 +377,12 @@ export default function BuilderPage() {
                     <UploadCloud className="h-6 w-6 text-violet-300" />
                   </div>
                   <div className="text-center">
-                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop File Here' : 'Upload & AI Autofill')}</p>
-                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop existing PDF/Image</p>
+                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop Document Here' : 'Upload & AI Autofill')}</p>
+                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop PDF/Image</p>
                   </div>
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf, image/png, image/jpeg, image/jpg" className="hidden" />
+                {/* ALLOW IMAGE UPLOADS TOO */}
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,image/*" className="hidden" />
                 
                 <button onClick={() => setStep(1)} className="group flex h-40 sm:h-44 flex-col items-center justify-center gap-4 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 font-medium text-white transition-all duration-300 hover:from-violet-500 hover:to-indigo-600 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-900/40 active:scale-[0.98]">
                   <div className="flex h-13 w-13 items-center justify-center rounded-xl bg-white/15 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3">
@@ -474,8 +446,8 @@ export default function BuilderPage() {
 
                 {step === 2 && (
                   <div className="space-y-5">
-                    {data.education.length === 0 ? emptyState('Where did you study?', () => addArrayItem('education', { degree: '', institution: '', startMonth: '', startYear: '', endMonth: '', endYear: '', grade: '' }), 'Add Your First Degree') : <>
-                      {sectionHeader('Education', 'Add your academic qualifications.', () => addArrayItem('education', { degree: '', institution: '', startMonth: '', startYear: '', endMonth: '', endYear: '', grade: '' }), 'Add Degree')}
+                    {data.education.length === 0 ? emptyState('Where did you study?', () => addArrayItem('education', { degree: '', institution: '', duration: '', grade: '' }), 'Add Your First Degree') : <>
+                      {sectionHeader('Education', 'Add your academic qualifications.', () => addArrayItem('education', { degree: '', institution: '', duration: '', grade: '' }), 'Add Degree')}
                       <AnimatePresence>
                         {data.education.map((edu: any) => (
                           <motion.div key={edu.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
@@ -483,52 +455,7 @@ export default function BuilderPage() {
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0">
                               {renderInput({ label: 'Degree / Qualification', value: edu.degree, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, degree: v } : i)), placeholder: 'Degree / Qualification' })}
                               {renderInput({ label: 'College / University', value: edu.institution, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, institution: v } : i)), placeholder: 'College / University' })}
-                              
-                              <div className="relative w-full space-y-1.5 group">
-                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">Start Date</label>
-                                <div className="flex gap-2">
-                                  <select 
-                                    value={edu.startMonth || ''} 
-                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, startMonth: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
-                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
-                                  </select>
-                                  <select 
-                                    value={edu.startYear || ''} 
-                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, startYear: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
-                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
-                                  </select>
-                                </div>
-                              </div>
-                              
-                              <div className="relative w-full space-y-1.5 group">
-                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">End Date</label>
-                                <div className="flex gap-2">
-                                  <select 
-                                    value={edu.endMonth || ''} 
-                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, endMonth: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
-                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
-                                  </select>
-                                  <select 
-                                    value={edu.endYear || ''} 
-                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, endYear: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
-                                    <option value="Present" className="bg-[#1a0733]">Present</option>
-                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
-                                  </select>
-                                </div>
-                              </div>
-                              
+                              {renderInput({ label: 'Duration', value: edu.duration, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
                               {renderInput({ label: 'Grade / GPA', value: edu.grade, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, grade: v } : i)), placeholder: 'Grade / GPA' })}
                             </div>
                           </motion.div>
@@ -555,8 +482,8 @@ export default function BuilderPage() {
 
                 {step === 4 && (
                   <div className="space-y-5">
-                    {data.experience.length === 0 ? emptyState('Where have you worked?', () => addArrayItem('experience', { title: '', company: '', startMonth: '', startYear: '', endMonth: '', endYear: '', responsibilities: '' }), 'Add Your First Job') : <>
-                      {sectionHeader('Experience', 'Your work history and internships.', () => addArrayItem('experience', { title: '', company: '', startMonth: '', startYear: '', endMonth: '', endYear: '', responsibilities: '' }), 'Add Job')}
+                    {data.experience.length === 0 ? emptyState('Where have you worked?', () => addArrayItem('experience', { title: '', company: '', duration: '', responsibilities: '' }), 'Add Your First Job') : <>
+                      {sectionHeader('Experience', 'Your work history and internships.', () => addArrayItem('experience', { title: '', company: '', duration: '', responsibilities: '' }), 'Add Job')}
                       <AnimatePresence>
                         {data.experience.map((exp: any) => (
                           <motion.div key={exp.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
@@ -564,52 +491,7 @@ export default function BuilderPage() {
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
                               {renderInput({ label: 'Job Title', value: exp.title, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, title: v } : i)), placeholder: 'Previous Job Role' })}
                               {renderInput({ label: 'Company', value: exp.company, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, company: v } : i)), placeholder: 'Company name' })}
-                              
-                              <div className="relative w-full space-y-1.5 group">
-                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">Start Date</label>
-                                <div className="flex gap-2">
-                                  <select 
-                                    value={exp.startMonth || ''} 
-                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, startMonth: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
-                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
-                                  </select>
-                                  <select 
-                                    value={exp.startYear || ''} 
-                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, startYear: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
-                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
-                                  </select>
-                                </div>
-                              </div>
-                              
-                              <div className="relative w-full space-y-1.5 group">
-                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">End Date</label>
-                                <div className="flex gap-2">
-                                  <select 
-                                    value={exp.endMonth || ''} 
-                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, endMonth: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
-                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
-                                  </select>
-                                  <select 
-                                    value={exp.endYear || ''} 
-                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, endYear: e.target.value } : i))}
-                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
-                                  >
-                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
-                                    <option value="Present" className="bg-[#1a0733]">Present</option>
-                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
-                                  </select>
-                                </div>
-                              </div>
-
+                              {renderInput({ label: 'Duration', value: exp.duration, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
                             </div>
                             {renderInput({ label: 'Responsibilities & Achievements', value: exp.responsibilities, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, responsibilities: v } : i)), placeholder: 'Describe key achievements and measurable impact…', isTextarea: true, section: 'experience', id: exp.id, field: 'responsibilities' })}
                           </motion.div>
@@ -623,22 +505,18 @@ export default function BuilderPage() {
                   <div className="space-y-5">
                     {data.projects.length === 0 ? emptyState('What have you built?', () => addArrayItem('projects', { name: '', stack: '', description: '' }), 'Add Your First Project') : <>
                       {sectionHeader('Projects', 'Highlight your best work.', () => addArrayItem('projects', { name: '', stack: '', description: '' }), 'Add Project')}
-                      
-                      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <SortableContext items={data.projects.map((p: any) => p.id)} strategy={verticalListSortingStrategy}>
-                          {data.projects.map((proj: any) => (
-                            <SortableProjectItem key={proj.id} id={proj.id}>
-                              {deleteBtn(() => removeArrayItem('projects', proj.id))}
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2 sm:pt-0 mb-4">
-                                {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'Project name' })}
-                                {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'technology used' })}
-                              </div>
-                              {renderInput({ label: 'Description & Impact', value: proj.description, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, description: v } : i)), placeholder: 'What problem did you solve? What was the outcome?', isTextarea: true, section: 'projects', id: proj.id, field: 'description' })}
-                            </SortableProjectItem>
-                          ))}
-                        </SortableContext>
-                      </DndContext>
-                      
+                      <AnimatePresence>
+                        {data.projects.map((proj: any) => (
+                          <motion.div key={proj.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
+                            {deleteBtn(() => removeArrayItem('projects', proj.id))}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
+                              {renderInput({ label: 'Project Name', value: proj.name, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, name: v } : i)), placeholder: 'Project name' })}
+                              {renderInput({ label: 'Tech Stack', value: proj.stack, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, stack: v } : i)), placeholder: 'technology used' })}
+                            </div>
+                            {renderInput({ label: 'Description & Impact', value: proj.description, onChange: (v) => updateData('projects', (p: any) => p.map((i: any) => i.id === proj.id ? { ...i, description: v } : i)), placeholder: 'What problem did you solve? What was the outcome?', isTextarea: true, section: 'projects', id: proj.id, field: 'description' })}
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
                     </>}
                   </div>
                 )}
