@@ -31,7 +31,7 @@ export const convertPdfAllPagesToImages = async (file: File): Promise<string[]> 
   
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 }); 
+    const viewport = page.getViewport({ scale: 1.25 }); 
     
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -40,7 +40,7 @@ export const convertPdfAllPagesToImages = async (file: File): Promise<string[]> 
     canvas.height = viewport.height;
     canvas.width = viewport.width;
     await page.render({ canvasContext: context, viewport: viewport }).promise;
-    imagesArray.push(canvas.toDataURL('image/jpeg', 0.8)); 
+    imagesArray.push(canvas.toDataURL('image/jpeg', 0.75)); 
   }
   
   return imagesArray;
