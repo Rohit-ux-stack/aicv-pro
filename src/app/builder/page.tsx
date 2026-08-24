@@ -26,6 +26,21 @@ const PDFViewer = dynamic(
 );
 
 // ---------------------------------------------------------------------------
+// Constants & Options
+// ---------------------------------------------------------------------------
+const months = [
+  { value: "1", label: "Jan" }, { value: "2", label: "Feb" }, 
+  { value: "3", label: "Mar" }, { value: "4", label: "Apr" },
+  { value: "5", label: "May" }, { value: "6", label: "Jun" },
+  { value: "7", label: "Jul" }, { value: "8", label: "Aug" },
+  { value: "9", label: "Sep" }, { value: "10", label: "Oct" },
+  { value: "11", label: "Nov" }, { value: "12", label: "Dec" }
+];
+
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: 40 }, (_, i) => (currentYear + 5 - i).toString());
+
+// ---------------------------------------------------------------------------
 // Custom GitHub SVG Component
 // ---------------------------------------------------------------------------
 const CustomGithubIcon = ({ className }: { className?: string }) => (
@@ -85,7 +100,7 @@ export default function BuilderPage() {
   const [isAiLoading,  setIsAiLoading]  = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isFullOptimizing, setIsFullOptimizing] = useState(false);
-  const [optimizeSuccess, setOptimizeSuccess] = useState(false); // NEW SUCCESS STATE
+  const [optimizeSuccess, setOptimizeSuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,8 +140,8 @@ export default function BuilderPage() {
       const result = await res.json();
       if (result.data) {
         loadFullData(result.data);
-        setOptimizeSuccess(true); // TRIGGER SUCCESS
-        setTimeout(() => setOptimizeSuccess(false), 5000); // RESET AFTER 5 SECONDS
+        setOptimizeSuccess(true);
+        setTimeout(() => setOptimizeSuccess(false), 5000);
       }
     } catch (error) {
       console.error(error);
@@ -226,14 +241,14 @@ export default function BuilderPage() {
 
       {isTextarea ? (
         <textarea
-          value={value}
+          value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="min-h-[108px] w-full resize-none rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] leading-relaxed text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
         />
       ) : (
         <input
-          value={value}
+          value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
@@ -390,8 +405,8 @@ export default function BuilderPage() {
 
                 {step === 2 && (
                   <div className="space-y-5">
-                    {data.education.length === 0 ? emptyState('Where did you study?', () => addArrayItem('education', { degree: '', institution: '', duration: '', grade: '' }), 'Add Your First Degree') : <>
-                      {sectionHeader('Education', 'Add your academic qualifications.', () => addArrayItem('education', { degree: '', institution: '', duration: '', grade: '' }), 'Add Degree')}
+                    {data.education.length === 0 ? emptyState('Where did you study?', () => addArrayItem('education', { degree: '', institution: '', startMonth: '', startYear: '', endMonth: '', endYear: '', grade: '' }), 'Add Your First Degree') : <>
+                      {sectionHeader('Education', 'Add your academic qualifications.', () => addArrayItem('education', { degree: '', institution: '', startMonth: '', startYear: '', endMonth: '', endYear: '', grade: '' }), 'Add Degree')}
                       <AnimatePresence>
                         {data.education.map((edu: any) => (
                           <motion.div key={edu.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
@@ -399,7 +414,52 @@ export default function BuilderPage() {
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0">
                               {renderInput({ label: 'Degree / Qualification', value: edu.degree, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, degree: v } : i)), placeholder: 'Degree / Qualification' })}
                               {renderInput({ label: 'College / University', value: edu.institution, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, institution: v } : i)), placeholder: 'College / University' })}
-                              {renderInput({ label: 'Duration', value: edu.duration, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
+                              
+                              <div className="relative w-full space-y-1.5 group">
+                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">Start Date</label>
+                                <div className="flex gap-2">
+                                  <select 
+                                    value={edu.startMonth || ''} 
+                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, startMonth: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
+                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
+                                  </select>
+                                  <select 
+                                    value={edu.startYear || ''} 
+                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, startYear: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
+                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              
+                              <div className="relative w-full space-y-1.5 group">
+                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">End Date</label>
+                                <div className="flex gap-2">
+                                  <select 
+                                    value={edu.endMonth || ''} 
+                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, endMonth: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
+                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
+                                  </select>
+                                  <select 
+                                    value={edu.endYear || ''} 
+                                    onChange={(e) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, endYear: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
+                                    <option value="Present" className="bg-[#1a0733]">Present</option>
+                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              
                               {renderInput({ label: 'Grade / GPA', value: edu.grade, onChange: (v) => updateData('education', (p: any) => p.map((i: any) => i.id === edu.id ? { ...i, grade: v } : i)), placeholder: 'Grade / GPA' })}
                             </div>
                           </motion.div>
@@ -426,8 +486,8 @@ export default function BuilderPage() {
 
                 {step === 4 && (
                   <div className="space-y-5">
-                    {data.experience.length === 0 ? emptyState('Where have you worked?', () => addArrayItem('experience', { title: '', company: '', duration: '', responsibilities: '' }), 'Add Your First Job') : <>
-                      {sectionHeader('Experience', 'Your work history and internships.', () => addArrayItem('experience', { title: '', company: '', duration: '', responsibilities: '' }), 'Add Job')}
+                    {data.experience.length === 0 ? emptyState('Where have you worked?', () => addArrayItem('experience', { title: '', company: '', startMonth: '', startYear: '', endMonth: '', endYear: '', responsibilities: '' }), 'Add Your First Job') : <>
+                      {sectionHeader('Experience', 'Your work history and internships.', () => addArrayItem('experience', { title: '', company: '', startMonth: '', startYear: '', endMonth: '', endYear: '', responsibilities: '' }), 'Add Job')}
                       <AnimatePresence>
                         {data.experience.map((exp: any) => (
                           <motion.div key={exp.id} variants={cardVariants} initial="initial" animate="animate" exit="exit" className={cardCls}>
@@ -435,7 +495,52 @@ export default function BuilderPage() {
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
                               {renderInput({ label: 'Job Title', value: exp.title, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, title: v } : i)), placeholder: 'Previous Job Role' })}
                               {renderInput({ label: 'Company', value: exp.company, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, company: v } : i)), placeholder: 'Company name' })}
-                              {renderInput({ label: 'Duration', value: exp.duration, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, duration: v } : i)), placeholder: 'Duration' })}
+                              
+                              <div className="relative w-full space-y-1.5 group">
+                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">Start Date</label>
+                                <div className="flex gap-2">
+                                  <select 
+                                    value={exp.startMonth || ''} 
+                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, startMonth: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
+                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
+                                  </select>
+                                  <select 
+                                    value={exp.startYear || ''} 
+                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, startYear: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
+                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              
+                              <div className="relative w-full space-y-1.5 group">
+                                <label className="ml-1 text-xs font-semibold uppercase tracking-widest text-violet-200">End Date</label>
+                                <div className="flex gap-2">
+                                  <select 
+                                    value={exp.endMonth || ''} 
+                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, endMonth: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Month</option>
+                                    {months.map(m => <option key={m.value} value={m.value} className="bg-[#1a0733]">{m.label}</option>)}
+                                  </select>
+                                  <select 
+                                    value={exp.endYear || ''} 
+                                    onChange={(e) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, endYear: e.target.value } : i))}
+                                    className="w-1/2 rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
+                                  >
+                                    <option value="" className="bg-[#1a0733] text-gray-400">Year</option>
+                                    <option value="Present" className="bg-[#1a0733]">Present</option>
+                                    {years.map(y => <option key={y} value={y} className="bg-[#1a0733]">{y}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+
                             </div>
                             {renderInput({ label: 'Responsibilities & Achievements', value: exp.responsibilities, onChange: (v) => updateData('experience', (p: any) => p.map((i: any) => i.id === exp.id ? { ...i, responsibilities: v } : i)), placeholder: 'Describe key achievements and measurable impact…', isTextarea: true, section: 'experience', id: exp.id, field: 'responsibilities' })}
                           </motion.div>
