@@ -185,7 +185,6 @@ export default function BuilderPage() {
   };
 
   const processFile = async (file: File) => {
-    // Check if the file is a PDF or an image
     const isValidFile = file.type === 'application/pdf' || file.type.startsWith('image/');
     
     if (!isValidFile) {
@@ -194,14 +193,48 @@ export default function BuilderPage() {
     }
     
     setIsLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+
     try {
-      const res = await fetch('/api/parse', { method: 'POST', body: formData });
-      const result = await res.json();
-      if (result.data) { loadFullData(result.data); setStep(1); }
-    } catch { alert('Parsing failed.'); setStep(1); }
-    finally { setIsLoading(false); }
+      let result;
+
+      // Handle Image Files
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        
+        // Wrap FileReader in a Promise to await its completion
+        const base64Image = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = error => reject(error);
+        });
+
+        const res = await fetch('/api/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64Image, type: 'image' })
+        });
+        result = await res.json();
+      } 
+      // Handle PDF Files
+      else if (file.type === 'application/pdf') {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/parse', { method: 'POST', body: formData });
+        result = await res.json();
+      }
+
+      // If data is successfully returned, load it into context
+      if (result && result.data) { 
+        loadFullData(result.data); 
+        setStep(1); 
+      }
+    } catch (error) { 
+      console.error("Parsing Error:", error);
+      alert('Parsing failed.'); 
+      setStep(1); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
