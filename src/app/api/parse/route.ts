@@ -15,6 +15,27 @@ const openRouter = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
 });
 
+// Safely parses a model's JSON response. Handles empty strings, truncated
+// output, and stray markdown fences instead of letting a raw SyntaxError
+// ("Unexpected end of JSON input") bubble up with no context.
+function safeJsonParse(raw: string | undefined | null, context: string) {
+  if (!raw || !raw.trim()) {
+    throw new Error(`${context}: model returned empty content`);
+  }
+
+  const cleaned = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    throw new Error(
+      `${context}: model returned invalid or truncated JSON (${
+        err instanceof Error ? err.message : String(err)
+      }). Raw output started with: ${cleaned.slice(0, 200)}`
+    );
+  }
+}
+
 const RESUME_SCHEMA = {
   type: "object",
   properties: {
@@ -243,10 +264,7 @@ async function parseResumeText(text: string) {
     });
 
     const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("Resume parser returned empty content");
-    }
-    return JSON.parse(content);
+    return safeJsonParse(content, "Groq resume parser (json_schema mode)");
   } catch (schemaError) {
     // Fallback for cases where strict json_schema isn't accepted:
     // fall back to json_object mode (same pattern as full-optimize route)
@@ -271,12 +289,7 @@ async function parseResumeText(text: string) {
     });
 
     const rawContent = completion.choices[0]?.message?.content;
-    if (!rawContent) {
-      throw new Error("Resume parser returned empty content");
-    }
-
-    const cleaned = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
-    return JSON.parse(cleaned);
+    return safeJsonParse(rawContent, "Groq resume parser (json_object fallback)");
   }
 }
 
@@ -331,12 +344,7 @@ Do not invent information.
     });
 
     const content = completion.choices[0]?.message?.content;
-
-    if (!content) {
-      throw new Error("OCR returned empty content");
-    }
-
-    const pageResult = JSON.parse(content);
+    const pageResult = safeJsonParse(content, "Nemotron OCR");
 
     if (pageResult.text) {
       extractedPages.push(pageResult.text);
@@ -348,7 +356,15 @@ Do not invent information.
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Request body is missing or not valid JSON" },
+        { status: 400 }
+      );
+    }
 
     let resumeText = "";
 
