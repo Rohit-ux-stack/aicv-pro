@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server';
+import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 
-// OpenRouter client setup using your OpenRouter API key
+// Groq client — used STRICTLY for text-based (readable) PDFs.
+// This matches ai-write, ats-optimize and full-optimize, which all
+// already call Groq natively with the same GROQ_API_KEY.
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// OpenRouter client — used STRICTLY for OCR on image/scanned PDFs.
+// Groq does not host the Nemotron vision model, so OCR keeps going
+// through OpenRouter. Text parsing no longer touches this client.
 const openRouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
@@ -208,40 +216,72 @@ Preserve the original meaning and factual information.
 `;
 
 async function parseResumeText(text: string) {
-  const completion = await openRouter.chat.completions.create({
-    model: "openai/gpt-oss-120b",
-    messages: [
-      {
-        role: "system",
-        content: SYSTEM_PROMPT
-      },
-      {
-        role: "user",
-        content: `Extract the following resume into the required structure:\n\n${text}`
-      }
-    ],
-    temperature: 0,
-    max_completion_tokens: 8192,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "resume",
-        strict: true,
-        schema: RESUME_SCHEMA
-      }
+  // STRICTLY Groq — readable/text PDFs never touch OpenRouter or Nemotron.
+  try {
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b",
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT
+        },
+        {
+          role: "user",
+          content: `Extract the following resume into the required structure:\n\n${text}`
+        }
+      ],
+      temperature: 0,
+      max_completion_tokens: 8192,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "resume",
+          strict: true,
+          schema: RESUME_SCHEMA
+        }
+      } as any
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Resume parser returned empty content");
     }
-  });
+    return JSON.parse(content);
+  } catch (schemaError) {
+    // Fallback for cases where strict json_schema isn't accepted:
+    // fall back to json_object mode (same pattern as full-optimize route)
+    // instead of ever routing text PDFs to a different provider/model.
+    console.warn("Groq json_schema mode failed, falling back to json_object:", schemaError);
 
-  const content = completion.choices[0]?.message?.content;
+    const completion = await groq.chat.completions.create({
+      model: "openai/gpt-oss-120b",
+      messages: [
+        {
+          role: "system",
+          content: `${SYSTEM_PROMPT}\n\nReturn STRICTLY valid JSON matching this schema (no markdown fences, no extra text):\n${JSON.stringify(RESUME_SCHEMA)}`
+        },
+        {
+          role: "user",
+          content: `Extract the following resume into the required structure:\n\n${text}`
+        }
+      ],
+      temperature: 0,
+      max_completion_tokens: 8192,
+      response_format: { type: "json_object" }
+    });
 
-  if (!content) {
-    throw new Error("Resume parser returned empty content");
+    const rawContent = completion.choices[0]?.message?.content;
+    if (!rawContent) {
+      throw new Error("Resume parser returned empty content");
+    }
+
+    const cleaned = rawContent.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(cleaned);
   }
-
-  return JSON.parse(content);
 }
 
 async function extractTextFromImages(images: string[]) {
+  // STRICTLY OpenRouter + Nemotron — scanned/image PDFs never touch Groq.
   const extractedPages: string[] = [];
 
   for (let i = 0; i < images.length; i += 5) {
@@ -308,28 +348,33 @@ Do not invent information.
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is missing in environment variables" },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json();
 
     let resumeText = "";
 
-    // TEXT PDF
+    // TEXT PDF — strictly Groq
     if (body.type === "text" && body.text?.trim()) {
+      if (!process.env.GROQ_API_KEY) {
+        return NextResponse.json(
+          { error: "GROQ_API_KEY is missing in environment variables" },
+          { status: 500 }
+        );
+      }
       resumeText = body.text.trim();
     }
 
-    // IMAGE / SCANNED PDF
+    // IMAGE / SCANNED PDF — strictly OpenRouter + Nemotron (OCR)
     else if (
       body.type === "image" &&
       Array.isArray(body.images) &&
       body.images.length > 0
     ) {
+      if (!process.env.OPENROUTER_API_KEY) {
+        return NextResponse.json(
+          { error: "OPENROUTER_API_KEY is missing in environment variables" },
+          { status: 500 }
+        );
+      }
       resumeText = await extractTextFromImages(body.images);
     }
 
@@ -347,7 +392,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error("OPENROUTER API ERROR:", {
+    console.error("PARSE API ERROR:", {
       name: error?.name,
       message: error?.message,
       status: error?.status,
