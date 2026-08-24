@@ -109,7 +109,7 @@ export async function POST(req: Request) {
       console.log('=== PROCESSING TEXT VIA STANDARD MODEL ===');
       
       const chatCompletion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         temperature: 0,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
       }));
 
       const chatCompletion = await groq.chat.completions.create({
-        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: "qwen/qwen3.6-27b",
         temperature: 0,
         messages: [
           {
