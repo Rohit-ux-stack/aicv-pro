@@ -33,20 +33,21 @@ export async function POST(req: Request) {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: `Parse this resume text:\n\n${body.text}` }
         ],
-        model: "llama-3.3-70b-versatile", // Currently active Groq Text Model
+        model: "llama-3.3-70b-versatile",
         temperature: 0.1,
         response_format: { type: "json_object" }
       });
 
-      const parsedJson = JSON.parse(chatCompletion.choices[0].message.content);
+      // TypeScript Fix: Add fallback "|| '{}'" in case content is null
+      const content = chatCompletion.choices[0]?.message?.content || "{}";
+      const parsedJson = JSON.parse(content);
+      
       return NextResponse.json(parsedJson);
     } 
     
     // 4. Handle Scanned PDFs / Images
     else if (body.type === 'image' && body.images && body.images.length > 0) {
-      // Format base64 images exactly how Groq Vision expects
       const imageContents = body.images.map((base64Str: string) => {
-        // Ensure proper base64 data URI format if missing
         const formattedUrl = base64Str.startsWith('data:image') 
           ? base64Str 
           : `data:image/jpeg;base64,${base64Str}`;
@@ -67,21 +68,21 @@ export async function POST(req: Request) {
             ]
           }
         ],
-        // Replace with the exact active Vision model from your Groq console if this one is rotated
         model: "llama-3.2-11b-vision-preview", 
         temperature: 0.1,
         response_format: { type: "json_object" }
       });
 
-      const parsedJson = JSON.parse(chatCompletion.choices[0].message.content);
+      // TypeScript Fix: Add fallback "|| '{}'" in case content is null
+      const content = chatCompletion.choices[0]?.message?.content || "{}";
+      const parsedJson = JSON.parse(content);
+      
       return NextResponse.json(parsedJson);
     }
 
-    // If payload structure doesn't match expected
     return NextResponse.json({ error: "Invalid payload type" }, { status: 400 });
 
   } catch (error: any) {
-    // 5. Detailed Error Logging for Vercel Logs
     console.error("GROQ API ERROR:", {
       name: error.name,
       message: error.message,
