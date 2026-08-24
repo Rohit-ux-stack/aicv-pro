@@ -222,6 +222,8 @@ async function parseResumeText(text: string) {
 
     temperature: 0,
 
+    max_completion_tokens: 8192,
+
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -289,6 +291,8 @@ Do not invent information.
       ],
 
       temperature: 0,
+
+      max_completion_tokens: 8192,
 
       response_format: {
         type: "json_object"
