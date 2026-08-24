@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
+// OpenRouter client setup using your OpenRouter API key
+const openRouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: 'https://openrouter.ai/api/v1',
 });
 
 const RESUME_SCHEMA = {
@@ -206,9 +208,8 @@ Preserve the original meaning and factual information.
 `;
 
 async function parseResumeText(text: string) {
-  const completion = await groq.chat.completions.create({
+  const completion = await openRouter.chat.completions.create({
     model: "openai/gpt-oss-120b",
-
     messages: [
       {
         role: "system",
@@ -219,11 +220,8 @@ async function parseResumeText(text: string) {
         content: `Extract the following resume into the required structure:\n\n${text}`
       }
     ],
-
     temperature: 0,
-
     max_completion_tokens: 8192,
-
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -246,7 +244,6 @@ async function parseResumeText(text: string) {
 async function extractTextFromImages(images: string[]) {
   const extractedPages: string[] = [];
 
-  // Groq vision supports up to 5 images per request.
   for (let i = 0; i < images.length; i += 5) {
     const batch = images.slice(i, i + 5);
 
@@ -259,9 +256,8 @@ async function extractTextFromImages(images: string[]) {
       }
     }));
 
-    const completion = await groq.chat.completions.create({
-      model: "qwen/qwen3.6-27b",
-
+    const completion = await openRouter.chat.completions.create({
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
       messages: [
         {
           role: "user",
@@ -270,9 +266,7 @@ async function extractTextFromImages(images: string[]) {
               type: "text",
               text: `
 Read these resume page images.
-
 Perform OCR on the images.
-
 Return ONLY JSON in this format:
 
 {
@@ -289,11 +283,8 @@ Do not invent information.
           ]
         }
       ],
-
       temperature: 0,
-
       max_completion_tokens: 8192,
-
       response_format: {
         type: "json_object"
       }
@@ -317,9 +308,9 @@ Do not invent information.
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.GROQ_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
-        { error: "GROQ_API_KEY is missing" },
+        { error: "OPENROUTER_API_KEY is missing in environment variables" },
         { status: 500 }
       );
     }
@@ -356,7 +347,7 @@ export async function POST(req: Request) {
     });
 
   } catch (error: any) {
-    console.error("GROQ API ERROR:", {
+    console.error("OPENROUTER API ERROR:", {
       name: error?.name,
       message: error?.message,
       status: error?.status,
