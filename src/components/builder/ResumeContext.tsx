@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { sortChronologically } from '@/lib/utils'; // Imported sorting utility
+import { arrayMove } from '@dnd-kit/sortable'; // Drag and Drop array reorder utility
 
 export type ResumeData = {
   personalInfo: {
@@ -59,6 +60,7 @@ const ResumeContext = createContext<{
   updateData: (section: keyof ResumeData, payload: any) => void;
   addArrayItem: (section: 'education' | 'experience' | 'projects', emptyItem: any) => void;
   removeArrayItem: (section: 'education' | 'experience' | 'projects', id: string) => void;
+  reorderArrayItem: (section: 'education' | 'experience' | 'projects', oldIndex: number, newIndex: number) => void;
   loadFullData: (parsedData: ResumeData) => void;
 } | undefined>(undefined);
 
@@ -166,6 +168,13 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
     }));
   };
 
+  const reorderArrayItem = (section: 'education' | 'experience' | 'projects', oldIndex: number, newIndex: number) => {
+    setData((prev) => ({
+      ...prev,
+      [section]: arrayMove(prev[section] as any[], oldIndex, newIndex),
+    }));
+  };
+
   const loadFullData = (parsedData: ResumeData) => {
     // Intercept parsed data from PDF and sort experience and education automatically
     setData({
@@ -176,7 +185,7 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <ResumeContext.Provider value={{ data, updateData, addArrayItem, removeArrayItem, loadFullData }}>
+    <ResumeContext.Provider value={{ data, updateData, addArrayItem, removeArrayItem, reorderArrayItem, loadFullData }}>
       {children}
     </ResumeContext.Provider>
   );
