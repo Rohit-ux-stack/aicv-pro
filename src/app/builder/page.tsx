@@ -21,6 +21,9 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableProjectItem } from '@/components/builder/SortableProjectItem';
 
+// PDF Utilities for Smart Routing
+import { extractTextFromPdf, convertPdfAllPagesToImages } from '@/lib/pdfUtils';
+
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
   { ssr: false }
@@ -195,33 +198,39 @@ export default function BuilderPage() {
     setIsLoading(true);
 
     try {
-      let result;
+      let payload = {};
 
-      // Handle Image Files
       if (file.type.startsWith('image/')) {
+        // CASE 1: Direct Image Upload
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        
-        // Wrap FileReader in a Promise to await its completion
-        const base64Image = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = error => reject(error);
-        });
-
-        const res = await fetch('/api/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64Image, type: 'image' })
-        });
-        result = await res.json();
+        await new Promise((resolve) => (reader.onload = resolve));
+        payload = { type: 'image', images: [reader.result] };
       } 
-      // Handle PDF Files
       else if (file.type === 'application/pdf') {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/parse', { method: 'POST', body: formData });
-        result = await res.json();
+        // CASE 2: PDF Upload (Smart Check)
+        const extractedText = await extractTextFromPdf(file);
+        
+        // Agar text 50 characters se zyada hai, matlab readable PDF hai
+        if (extractedText.length > 50) {
+          console.log("Readable text found. Using fast text extraction.");
+          payload = { type: 'text', text: extractedText };
+        } else {
+          // Agar text nahi mila, matlab scanned PDF (image) hai
+          console.log("No readable text. Converting PDF to images for OCR.");
+          const base64ImagesArray = await convertPdfAllPagesToImages(file);
+          payload = { type: 'image', images: base64ImagesArray };
+        }
       }
+
+      // Send payload to backend
+      const res = await fetch('/api/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const result = await res.json();
 
       // If data is successfully returned, load it into context
       if (result && result.data) { 
