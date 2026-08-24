@@ -33,7 +33,7 @@ export async function POST(req: Request) {
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: `Parse this resume text:\n\n${body.text}` }
         ],
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         temperature: 0.1,
         response_format: { type: "json_object" }
       });
