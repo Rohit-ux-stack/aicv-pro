@@ -1,16 +1,14 @@
 // Safe pdfjs-dist import to bypass Next.js server-side bundling checks for 'canvas'
 export const extractTextFromPdf = async (file: File): Promise<string> => {
   // Dynamic import so Turbopack doesn't try to resolve node canvas during build time
-  const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs');
+  const pdfjsLib = await import('pdfjs-dist/build/pdf.js');
   
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   }
-
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let fullText = '';
-
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
@@ -22,12 +20,11 @@ export const extractTextFromPdf = async (file: File): Promise<string> => {
 };
 
 export const convertPdfAllPagesToImages = async (file: File): Promise<string[]> => {
-  const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs');
+  const pdfjsLib = await import('pdfjs-dist/build/pdf.js');
   
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
   }
-
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const imagesArray: string[] = [];
@@ -42,7 +39,6 @@ export const convertPdfAllPagesToImages = async (file: File): Promise<string[]> 
     
     canvas.height = viewport.height;
     canvas.width = viewport.width;
-
     await page.render({ canvasContext: context, viewport: viewport }).promise;
     imagesArray.push(canvas.toDataURL('image/jpeg', 0.8)); 
   }
