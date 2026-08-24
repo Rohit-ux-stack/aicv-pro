@@ -185,10 +185,14 @@ export default function BuilderPage() {
   };
 
   const processFile = async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      alert("Please upload a valid PDF document.");
+    // Check if the file is a PDF or an image
+    const isValidFile = file.type === 'application/pdf' || file.type.startsWith('image/');
+    
+    if (!isValidFile) {
+      alert("Please upload a valid PDF or Image (PNG/JPG) document.");
       return;
     }
+    
     setIsLoading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -341,7 +345,7 @@ export default function BuilderPage() {
               </div>
               <div className="space-y-3">
                 <h2 className="text-[clamp(2rem,6vw,3.5rem)] font-black tracking-tight text-white leading-[1.1]">Your resume,<br /><span className="bg-gradient-to-r from-violet-300 via-indigo-300 to-violet-400 bg-clip-text text-transparent">reinvented by AI</span></h2>
-                <p className="mx-auto max-w-lg text-base sm:text-lg text-violet-200/70 leading-relaxed font-medium">Upload a PDF for instant AI extraction, or craft a polished, ATS-ready document from scratch in minutes.</p>
+                <p className="mx-auto max-w-lg text-base sm:text-lg text-violet-200/70 leading-relaxed font-medium">Upload a PDF or Image for instant AI extraction, or craft a polished, ATS-ready document from scratch in minutes.</p>
               </div>
               <div className="mx-auto grid max-w-2xl grid-cols-1 gap-5 pt-4 sm:grid-cols-2">
                 
@@ -360,11 +364,11 @@ export default function BuilderPage() {
                     <UploadCloud className="h-6 w-6 text-violet-300" />
                   </div>
                   <div className="text-center">
-                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop PDF Here' : 'Upload & AI Autofill')}</p>
-                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop existing PDF</p>
+                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop File Here' : 'Upload & AI Autofill')}</p>
+                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop existing PDF/Image</p>
                   </div>
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf" className="hidden" />
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="application/pdf, image/png, image/jpeg, image/jpg" className="hidden" />
                 
                 <button onClick={() => setStep(1)} className="group flex h-40 sm:h-44 flex-col items-center justify-center gap-4 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 font-medium text-white transition-all duration-300 hover:from-violet-500 hover:to-indigo-600 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-900/40 active:scale-[0.98]">
                   <div className="flex h-13 w-13 items-center justify-center rounded-xl bg-white/15 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3">
