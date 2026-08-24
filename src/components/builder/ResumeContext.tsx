@@ -1,5 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { sortChronologically } from '@/lib/utils'; // Imported sorting utility
 
 export type ResumeData = {
   personalInfo: {
@@ -12,11 +13,36 @@ export type ResumeData = {
     website: string; // ⚠️ Reused internally as "Job Profile / Target Role" field
     summary: string;
   };
-  education: Array<{ id: string; degree: string; institution: string; board: string; location: string; duration: string; grade: string; coursework: string; achievements: string; }>;
+  education: Array<{ 
+    id: string; 
+    degree: string; 
+    institution: string; 
+    board?: string; 
+    location?: string; 
+    duration?: string; 
+    startMonth?: string; 
+    startYear?: string; 
+    endMonth?: string; 
+    endYear?: string; 
+    grade: string; 
+    coursework?: string; 
+    achievements?: string; 
+  }>;
   skills: { technical: string; soft: string; tools: string; languages: string; };
-  experience: Array<{ id: string; title: string; company: string; location: string; duration: string; responsibilities: string; }>;
-  projects: Array<{ id: string; name: string; stack: string; description: string; role: string; link: string; duration: string; }>;
-  extras: { certifications: string; awards: string; activities: string; hobbies: string; references: string; };
+  experience: Array<{ 
+    id: string; 
+    title: string; 
+    company: string; 
+    location?: string; 
+    duration?: string; 
+    startMonth?: string; 
+    startYear?: string; 
+    endMonth?: string; 
+    endYear?: string; 
+    responsibilities: string; 
+  }>;
+  projects: Array<{ id: string; name: string; stack: string; description: string; role?: string; link?: string; duration?: string; }>;
+  extras: { certifications: string; awards: string; activities?: string; hobbies: string; references: string; };
 };
 
 const defaultState: ResumeData = {
@@ -99,17 +125,38 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Actions
   const updateData = (section: keyof ResumeData, payload: any) => {
-    setData((prev) => ({
-      ...prev,
-      [section]: typeof payload === 'function' ? payload(prev[section]) : { ...prev[section], ...payload }
-    }));
+    setData((prev) => {
+      // Handle payload evaluation
+      let updatedSection = typeof payload === 'function' 
+        ? payload(prev[section]) 
+        : (Array.isArray(prev[section]) ? payload : { ...prev[section], ...payload });
+
+      // Intercept and auto-sort if the section is education or experience
+      if (section === 'education' || section === 'experience') {
+        updatedSection = sortChronologically(updatedSection);
+      }
+
+      return {
+        ...prev,
+        [section]: updatedSection
+      };
+    });
   };
 
   const addArrayItem = (section: 'education' | 'experience' | 'projects', emptyItem: any) => {
-    setData((prev) => ({
-      ...prev,
-      [section]: [...(prev[section] as any[]), { ...emptyItem, id: crypto.randomUUID() }]
-    }));
+    setData((prev) => {
+      let newArray = [...(prev[section] as any[]), { ...emptyItem, id: crypto.randomUUID() }];
+      
+      // Auto-sort immediately after adding a new item
+      if (section === 'education' || section === 'experience') {
+        newArray = sortChronologically(newArray);
+      }
+
+      return {
+        ...prev,
+        [section]: newArray
+      };
+    });
   };
 
   const removeArrayItem = (section: 'education' | 'experience' | 'projects', id: string) => {
@@ -119,7 +166,14 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
     }));
   };
 
-  const loadFullData = (parsedData: ResumeData) => setData(parsedData);
+  const loadFullData = (parsedData: ResumeData) => {
+    // Intercept parsed data from PDF and sort experience and education automatically
+    setData({
+      ...parsedData,
+      experience: Array.isArray(parsedData.experience) ? sortChronologically(parsedData.experience) : [],
+      education: Array.isArray(parsedData.education) ? sortChronologically(parsedData.education) : []
+    });
+  };
 
   return (
     <ResumeContext.Provider value={{ data, updateData, addArrayItem, removeArrayItem, loadFullData }}>
