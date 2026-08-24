@@ -1,8 +1,11 @@
-// next.config.ts
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // nothing needed here anymore
+  turbopack: {
+    resolveAlias: {
+      canvas: './empty-module.ts',
+    },
+  },
 };
 
 export default nextConfig;
