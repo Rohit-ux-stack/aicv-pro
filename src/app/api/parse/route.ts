@@ -118,6 +118,64 @@ function buildUserPrompt(rawText: string): string {
 
 export async function POST(req: Request) {
   try {
+    const contentType = req.headers.get('content-type') || '';
+
+    // ── 1. HANDLE IMAGE UPLOADS (VISION MODEL) ─────────────────────────────
+    if (contentType.includes('application/json')) {
+      const { image, type } = await req.json();
+      
+      if (type === 'image') {
+        console.log('=== PROCESSING IMAGE VIA VISION MODEL ===');
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `You are an expert ATS resume parser. Extract ALL resume details from this image and return ONLY a strict JSON object matching the exact schema below. Follow all extraction rules strictly. Do not include markdown formatting, code fences, or any extra text.
+                  
+                  REQUIRED SCHEMA:
+                  {
+                    "personalInfo": { "fullName": "", "phone": "", "email": "", "location": "", "linkedin": "", "github": "", "website": "", "summary": "" },
+                    "education": [ { "id": "edu1", "degree": "", "institution": "", "board": "", "location": "", "duration": "", "grade": "", "coursework": "", "achievements": "" } ],
+                    "skills": { "technical": "", "soft": "", "tools": "", "languages": "" },
+                    "experience": [ { "id": "exp1", "title": "", "company": "", "location": "", "duration": "", "responsibilities": "" } ],
+                    "projects": [ { "id": "proj1", "name": "", "stack": "", "description": "", "role": "", "link": "", "duration": "" } ],
+                    "extras": { "certifications": "", "awards": "", "activities": "", "hobbies": "", "references": "Available upon request" }
+                  }
+                  
+                  EXTRACTION RULES:
+                  1. "responsibilities" and "description" MUST contain every bullet point separated by " | ".
+                  2. Use "" for missing fields, never null.
+                  3. Extract all tech stack to "technical", tools to "tools", soft skills to "soft".
+                  `
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: image // Base64 string from frontend
+                  }
+                }
+              ]
+            }
+          ],
+          model: "llama-3.2-11b-vision-preview", // Groq's fast vision model
+          temperature: 0.1, 
+          response_format: { type: "json_object" } 
+        });
+
+        const raw = chatCompletion.choices[0].message.content ?? '{}';
+        console.log('=== VISION AI PARSED OUTPUT ===');
+        console.log(raw);
+        console.log('========================');
+
+        const parsedJson = JSON.parse(raw);
+        return NextResponse.json({ data: parsedJson });
+      }
+    }
+
+    // ── 2. HANDLE PDF UPLOADS (TEXT EXTRACTION) ────────────────────────────
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -141,7 +199,7 @@ export async function POST(req: Request) {
     }
 
     const completion = await groq.chat.completions.create({
-  model: 'openai/gpt-oss-120b',
+      model: 'llama-3.3-70b-versatile', // Optional: Switched to a standard Groq text model if openai/gpt-oss-120b was a placeholder, revert if needed
       temperature: 0,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
@@ -159,8 +217,8 @@ export async function POST(req: Request) {
     const parsed = JSON.parse(raw);
     return NextResponse.json({ data: parsed });
 
-      } catch (error) {
-    console.error('--- PDF PARSING ERROR ---', error);
-    return NextResponse.json({ error: 'Failed to parse resume.' }, { status: 500 });
+  } catch (error) {
+    console.error('--- PARSING ERROR ---', error);
+    return NextResponse.json({ error: 'Failed to parse document.' }, { status: 500 });
   }
 }
