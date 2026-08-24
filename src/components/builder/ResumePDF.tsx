@@ -63,6 +63,12 @@ const styles = StyleSheet.create({
 /** Turns "React,Node,Java" → "React | Node | Java" */
 const formatTags = (tags: string) => (tags ? tags.split(',').join(' | ') : '');
 
+const getMonthName = (monthNumber?: string) => {
+  if (!monthNumber) return '';
+  const date = new Date(2000, parseInt(monthNumber) - 1, 1);
+  return date.toLocaleString('en-US', { month: 'short' }); 
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -113,7 +119,11 @@ export const ResumePDF = ({ data }: { data: ResumeData }) => (
             <View key={exp.id} style={styles.itemContainer}>
               <View style={styles.itemHeader}>
                 <Text style={styles.title}>{exp.title} at {exp.company}</Text>
-                <Text style={styles.date}>{exp.duration}</Text>
+                <Text style={styles.date}>
+                  {exp.startMonth ? getMonthName(exp.startMonth) : ''} {exp.startYear ? exp.startYear : ''} 
+                  {(exp.startMonth || exp.startYear) && (exp.endMonth || exp.endYear) ? ' - ' : ''}
+                  {exp.endYear === 'Present' ? 'Present' : `${exp.endMonth ? getMonthName(exp.endMonth) : ''} ${exp.endYear ? exp.endYear : ''}`}
+                </Text>
               </View>
               <Text style={styles.body}>{exp.responsibilities}</Text>
             </View>
@@ -150,7 +160,11 @@ export const ResumePDF = ({ data }: { data: ResumeData }) => (
             <View key={edu.id} style={styles.itemContainer}>
               <View style={styles.itemHeader}>
                 <Text style={styles.title}>{edu.institution}</Text>
-                <Text style={styles.date}>{edu.duration}</Text>
+                <Text style={styles.date}>
+                  {edu.startMonth ? getMonthName(edu.startMonth) : ''} {edu.startYear ? edu.startYear : ''} 
+                  {(edu.startMonth || edu.startYear) && (edu.endMonth || edu.endYear) ? ' - ' : ''}
+                  {edu.endYear === 'Present' ? 'Present' : `${edu.endMonth ? getMonthName(edu.endMonth) : ''} ${edu.endYear ? edu.endYear : ''}`}
+                </Text>
               </View>
               <Text style={styles.subtitle}>
                 {edu.degree}{edu.grade ? ` | ${edu.grade}` : ''}
