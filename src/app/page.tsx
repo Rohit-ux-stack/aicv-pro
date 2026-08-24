@@ -16,6 +16,9 @@ import { Button } from '@/components/ui/button';
 import { SmartTagInput } from '@/components/ui/SmartTagInput';
 import { ResumePDF } from '@/components/builder/ResumePDF';
 
+// 1. ADDED: New PDF Utils for Client-Side Parsing
+import { extractTextFromPdf, convertPdfAllPagesToImages } from '@/lib/pdfUtils';
+
 const PDFDownloadLink = dynamic(
   () => import('@react-pdf/renderer').then((mod) => mod.PDFDownloadLink),
   { ssr: false }
@@ -85,7 +88,7 @@ export default function BuilderPage() {
   const [isAiLoading,  setIsAiLoading]  = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isFullOptimizing, setIsFullOptimizing] = useState(false);
-  const [optimizeSuccess, setOptimizeSuccess] = useState(false); // NEW SUCCESS STATE
+  const [optimizeSuccess, setOptimizeSuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,8 +128,8 @@ export default function BuilderPage() {
       const result = await res.json();
       if (result.data) {
         loadFullData(result.data);
-        setOptimizeSuccess(true); // TRIGGER SUCCESS
-        setTimeout(() => setOptimizeSuccess(false), 5000); // RESET AFTER 5 SECONDS
+        setOptimizeSuccess(true);
+        setTimeout(() => setOptimizeSuccess(false), 5000);
       }
     } catch (error) {
       console.error(error);
@@ -146,20 +149,72 @@ export default function BuilderPage() {
     finally { setIsAiLoading(false); }
   };
 
+  // 2. UPDATED: Smart File Processing Function
   const processFile = async (file: File) => {
-    if (file.type !== 'application/pdf') {
-      alert("Please upload a valid PDF document.");
+    const isValidFile = file.type === 'application/pdf' || file.type.startsWith('image/');
+    if (!isValidFile) {
+      alert("Please upload a valid PDF or Image document.");
       return;
     }
+
     setIsLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+
     try {
-      const res = await fetch('/api/parse', { method: 'POST', body: formData });
-      const result = await res.json();
-      if (result.data) { loadFullData(result.data); setStep(1); }
-    } catch { alert('Parsing failed.'); setStep(1); }
-    finally { setIsLoading(false); }
+      let payload = {};
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        await new Promise((resolve) => (reader.onload = resolve));
+        payload = { type: 'image', images: [reader.result] };
+      } 
+      else if (file.type === 'application/pdf') {
+        const extractedText = await extractTextFromPdf(file);
+        
+        if (extractedText && extractedText.length > 50) {
+          payload = { type: 'text', text: extractedText };
+        } else {
+          // If text extraction fails (scanned PDF), use image conversion fallback
+          const base64ImagesArray = await convertPdfAllPagesToImages(file);
+          payload = { type: 'image', images: base64ImagesArray };
+        }
+      }
+
+      const response = await fetch('/api/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || `Server returned ${response.status}`);
+      }
+      
+      const parsedData = await response.json();
+      if (parsedData.data) {
+        // Try parsing the string returned by AI to JSON if needed, or if API returns JSON string
+        try {
+          const jsonMatch = parsedData.data.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const finalData = JSON.parse(jsonMatch[0]);
+            loadFullData(finalData);
+          }
+        } catch (e) {
+          console.warn("Could not parse AI response as pure JSON. Ensure API returns proper structure.", e);
+        }
+        setStep(1);
+      } else {
+        throw new Error("No data received from API");
+      }
+
+    } catch (error: any) {
+      console.error("Upload Error:", error);
+      alert(`Could not process the document: ${error.message || 'Unknown error'}`);
+      setStep(1); // Proceed anyway to manual step
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,14 +281,14 @@ export default function BuilderPage() {
 
       {isTextarea ? (
         <textarea
-          value={value}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="min-h-[108px] w-full resize-none rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] leading-relaxed text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
         />
       ) : (
         <input
-          value={value}
+          value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full rounded-xl border border-violet-400/25 bg-white/[0.06] p-3.5 text-[15px] text-white placeholder:text-slate-500 outline-none transition-all duration-200 focus:border-violet-400/70 focus:bg-white/[0.10] focus:ring-2 focus:ring-violet-500/20"
@@ -322,11 +377,12 @@ export default function BuilderPage() {
                     <UploadCloud className="h-6 w-6 text-violet-300" />
                   </div>
                   <div className="text-center">
-                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop PDF Here' : 'Upload & AI Autofill')}</p>
-                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop existing PDF</p>
+                    <p className="text-base font-bold text-white">{isLoading ? 'Analyzing…' : (isDragging ? 'Drop Document Here' : 'Upload & AI Autofill')}</p>
+                    <p className="mt-0.5 text-xs text-violet-300/55 font-normal">Click or drag & drop PDF/Image</p>
                   </div>
                 </div>
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf" className="hidden" />
+                {/* ALLOW IMAGE UPLOADS TOO */}
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,image/*" className="hidden" />
                 
                 <button onClick={() => setStep(1)} className="group flex h-40 sm:h-44 flex-col items-center justify-center gap-4 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-700 font-medium text-white transition-all duration-300 hover:from-violet-500 hover:to-indigo-600 hover:scale-[1.02] hover:shadow-xl hover:shadow-violet-900/40 active:scale-[0.98]">
                   <div className="flex h-13 w-13 items-center justify-center rounded-xl bg-white/15 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3">
