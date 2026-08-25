@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
   try {
     const { text } = await req.json();
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${process.env.NVIDIA_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
+        model: "nvidia/llama-3.3-nemotron-super-49b-v1",
         messages: [
           {
             role: "system",
@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     const result = await response.json();
 
     if (!response.ok) {
-      console.error('Groq API error:', result);
-      const groqMessage = result?.error?.message || `Groq returned status ${response.status}`;
-      return NextResponse.json({ error: 'Optimization failed', detail: groqMessage }, { status: 500 });
+      console.error('Nemotron API error:', result);
+      const nemotronMessage = result?.error?.message || `Nemotron returned status ${response.status}`;
+      return NextResponse.json({ error: 'Optimization failed', detail: nemotronMessage }, { status: 500 });
     }
 
     return NextResponse.json({ data: result.choices[0].message.content.trim() });
