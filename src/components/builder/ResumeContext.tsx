@@ -61,6 +61,7 @@ const ResumeContext = createContext<{
   addArrayItem: (section: 'education' | 'experience' | 'projects', emptyItem: any) => void;
   removeArrayItem: (section: 'education' | 'experience' | 'projects', id: string) => void;
   reorderArrayItem: (section: 'education' | 'experience' | 'projects', oldIndex: number, newIndex: number) => void;
+  sortSection: (section: 'education' | 'experience') => void;
   loadFullData: (parsedData: ResumeData) => void;
 } | undefined>(undefined);
 
@@ -133,10 +134,12 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
         ? payload(prev[section]) 
         : (Array.isArray(prev[section]) ? payload : { ...prev[section], ...payload });
 
-      // Intercept and auto-sort if the section is education or experience
-      if (section === 'education' || section === 'experience') {
-        updatedSection = sortChronologically(updatedSection);
-      }
+      // NOTE: previously auto-sorted education/experience by date on every
+      // single field edit here. That fought manual drag-to-reorder — the
+      // moment you edited any field (even an unrelated one like job title),
+      // the whole list would silently resort and undo your arrangement.
+      // Sorting now only happens on AI-parse import (loadFullData) and
+      // on-demand via sortSection(), so drag order always sticks.
 
       return {
         ...prev,
@@ -145,20 +148,18 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
-  const addArrayItem = (section: 'education' | 'experience' | 'projects', emptyItem: any) => {
-    setData((prev) => {
-      let newArray = [...(prev[section] as any[]), { ...emptyItem, id: crypto.randomUUID() }];
-      
-      // Auto-sort immediately after adding a new item
-      if (section === 'education' || section === 'experience') {
-        newArray = sortChronologically(newArray);
-      }
+  const sortSection = (section: 'education' | 'experience') => {
+    setData((prev) => ({
+      ...prev,
+      [section]: sortChronologically(prev[section] as any[])
+    }));
+  };
 
-      return {
-        ...prev,
-        [section]: newArray
-      };
-    });
+  const addArrayItem = (section: 'education' | 'experience' | 'projects', emptyItem: any) => {
+    setData((prev) => ({
+      ...prev,
+      [section]: [...(prev[section] as any[]), { ...emptyItem, id: crypto.randomUUID() }]
+    }));
   };
 
   const removeArrayItem = (section: 'education' | 'experience' | 'projects', id: string) => {
@@ -185,7 +186,7 @@ export const ResumeProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <ResumeContext.Provider value={{ data, updateData, addArrayItem, removeArrayItem, reorderArrayItem, loadFullData }}>
+    <ResumeContext.Provider value={{ data, updateData, addArrayItem, removeArrayItem, reorderArrayItem, sortSection, loadFullData }}>
       {children}
     </ResumeContext.Provider>
   );
