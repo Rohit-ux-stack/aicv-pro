@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// NVIDIA build.nvidia.com — OpenAI-compatible endpoint, used for BOTH
-// text-PDF parsing (nemotron-super, text-only) and OCR on image/scanned
-// PDFs (nemotron-3-nano-omni, vision-capable). Same client, same key —
-// this matches ai-write, ats-optimize and full-optimize, which all
-// already call NVIDIA natively with NVIDIA_API_KEY.
+// NVIDIA build.nvidia.com — OpenAI-compatible endpoint. Nemotron 3 Nano
+// Omni handles BOTH text-PDF parsing and OCR on image/scanned PDFs — it's
+// a genuinely omni-modal model (text + vision in, text out), so one model
+// and one client cover the whole route. This matches ai-write,
+// ats-optimize and full-optimize, which all call NVIDIA natively with
+// NVIDIA_API_KEY.
 const nemotron = new OpenAI({
   apiKey: process.env.NVIDIA_API_KEY,
   baseURL: 'https://integrate.api.nvidia.com/v1',
@@ -259,13 +260,13 @@ Preserve the original meaning and factual information.
 `;
 
 async function parseResumeText(text: string) {
-  // Text-based (readable) PDFs — uses the text-only Nemotron model.
+  // Text-based (readable) PDFs — uses Nemotron 3 Nano Omni (same model as OCR).
   const userMessage = `Extract the following resume into the required structure:\n\n${text}`;
   const promptForBudget = SYSTEM_PROMPT + userMessage;
 
   try {
     const completion = await nemotron.chat.completions.create({
-      model: "nvidia/llama-3.3-nemotron-super-49b-v1",
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
       messages: [
         {
           role: "system",
@@ -312,7 +313,7 @@ async function parseResumeText(text: string) {
     const fallbackPromptForBudget = fallbackSystemPrompt + userMessage;
 
     const completion = await nemotron.chat.completions.create({
-      model: "nvidia/llama-3.3-nemotron-super-49b-v1",
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
       messages: [
         {
           role: "system",
