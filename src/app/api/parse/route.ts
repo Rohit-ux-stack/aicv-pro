@@ -293,9 +293,9 @@ async function parseResumeText(text: string) {
       // chain-of-thought ("We need to parse...") into content instead of
       // clean JSON, breaking response_format entirely. This forces the
       // instruct (non-thinking) path, which is both faster and correct here.
-      extra_body: {
-        chat_template_kwargs: { enable_thinking: false }
-      }
+      // NOTE: the Node SDK (unlike Python's) has no extra_body unwrapping,
+      // so this must be a top-level key, not nested under extra_body.
+      chat_template_kwargs: { enable_thinking: false }
     } as any);
 
     const content = completion.choices[0]?.message?.content;
@@ -334,9 +334,7 @@ async function parseResumeText(text: string) {
       temperature: 0,
       max_completion_tokens: completionBudget(fallbackPromptForBudget, 8000, 1024, 6000),
       response_format: { type: "json_object" },
-      extra_body: {
-        chat_template_kwargs: { enable_thinking: false }
-      }
+      chat_template_kwargs: { enable_thinking: false }
     } as any);
 
     const rawContent = completion.choices[0]?.message?.content;
@@ -398,10 +396,8 @@ Do not invent information.
         type: "json_object"
       },
       // See parseResumeText: without this, Omni emits raw reasoning text
-      // instead of clean JSON.
-      extra_body: {
-        chat_template_kwargs: { enable_thinking: false }
-      }
+      // instead of clean JSON. Top-level key — Node SDK has no extra_body unwrapping.
+      chat_template_kwargs: { enable_thinking: false }
     } as any);
 
     const content = completion.choices[0]?.message?.content;
