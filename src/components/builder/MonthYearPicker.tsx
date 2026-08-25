@@ -52,12 +52,23 @@ export const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
       </label>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr]">
+
+        {/* Group labels — tell the user which pair of fields is the start date
+            and which is the end date, instead of relying on placeholder text
+            inside the dropdown alone. */}
+        <span className="col-span-2 -mb-1 ml-1 text-[11px] font-medium text-violet-300/60">
+          Beginning from
+        </span>
+        <span className="col-span-2 -mb-1 ml-1 text-[11px] font-medium text-violet-300/60">
+          Ended on
+        </span>
+
         <select
           value={startMonth || ''}
           onChange={(e) => onChange({ startMonth: e.target.value })}
           className={selectCls}
         >
-          <option value="" className="bg-slate-900">Start Month</option>
+          <option value="" className="bg-slate-900">Month</option>
           {MONTHS.map((m) => (
             <option key={m.value} value={m.value} className="bg-slate-900">
               {m.label}
@@ -70,7 +81,7 @@ export const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
           inputMode="numeric"
           value={startYear || ''}
           onChange={(e) => onChange({ startYear: e.target.value })}
-          placeholder="Start Year"
+          placeholder="Year"
           className={yearInputCls}
         />
 
@@ -80,7 +91,7 @@ export const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
           onChange={(e) => onChange({ endMonth: e.target.value })}
           className={selectCls}
         >
-          <option value="" className="bg-slate-900">End Month</option>
+          <option value="" className="bg-slate-900">Month</option>
           {MONTHS.map((m) => (
             <option key={m.value} value={m.value} className="bg-slate-900">
               {m.label}
@@ -94,7 +105,7 @@ export const MonthYearPicker: React.FC<MonthYearPickerProps> = ({
           value={isPresent ? '' : (endYear || '')}
           disabled={isPresent}
           onChange={(e) => onChange({ endYear: e.target.value })}
-          placeholder="End Year"
+          placeholder={isPresent ? 'Present' : 'Year'}
           className={yearInputCls}
         />
       </div>
