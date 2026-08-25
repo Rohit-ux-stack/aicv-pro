@@ -5,16 +5,23 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  DndContext, closestCenter, PointerSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
   Sparkles, ArrowRight, ArrowLeft, Plus, UploadCloud,
   FileText, Trash2, Download, Wand2, Briefcase, Zap,
   User, GraduationCap, Wrench, BriefcaseBusiness, FolderOpen,
-  Award, FileEdit, Mail, AlertCircle, CheckCircle2,
+  Award, FileEdit, Mail, AlertCircle, CheckCircle2, ArrowUpDown,
 } from 'lucide-react';
 
 import { useResume } from '@/components/builder/ResumeContext';
 import { Button } from '@/components/ui/button';
 import { SmartTagInput } from '@/components/ui/SmartTagInput';
 import { ResumePDF } from '@/components/builder/ResumePDF';
+import { MonthYearPicker } from '@/components/builder/MonthYearPicker';
+import { SortableItem } from '@/components/builder/SortableItem';
 
 import {
   extractTextFromPdf,
@@ -161,8 +168,29 @@ export default function BuilderPage() {
     updateData,
     addArrayItem,
     removeArrayItem,
+    reorderArrayItem,
+    sortSection,
     loadFullData
   } = useResume();
+
+  // Drag-and-drop reorder (experience / education / projects)
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const makeDragEndHandler = (section: 'education' | 'experience' | 'projects') =>
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+
+      const items = data[section] as any[];
+      const oldIndex = items.findIndex((i) => i.id === active.id);
+      const newIndex = items.findIndex((i) => i.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderArrayItem(section, oldIndex, newIndex);
+      }
+    };
 
   // -------------------------------------------------------------------------
   // Validation
@@ -611,7 +639,8 @@ export default function BuilderPage() {
     title: string,
     subtitle: string,
     onAdd: () => void,
-    btnLabel: string
+    btnLabel: string,
+    onSort?: () => void
   ) => (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-violet-500/15 pb-5">
 
@@ -625,13 +654,28 @@ export default function BuilderPage() {
         </p>
       </div>
 
-      <Button
-        onClick={onAdd}
-        className="w-full sm:w-auto border border-violet-500/40 bg-violet-500/10 text-violet-200 font-semibold hover:bg-violet-500/25 hover:text-white hover:border-violet-400/60 transition-all rounded-xl"
-      >
-        <Plus className="mr-2 h-4 w-4" />
-        {btnLabel}
-      </Button>
+      <div className="flex w-full gap-2 sm:w-auto">
+
+        {onSort && (
+          <button
+            onClick={onSort}
+            title="Auto-arrange by date (newest first)"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-violet-500/30 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-violet-300 transition-all hover:bg-white/[0.08] hover:text-white"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            Sort by date
+          </button>
+        )}
+
+        <Button
+          onClick={onAdd}
+          className="w-full sm:w-auto border border-violet-500/40 bg-violet-500/10 text-violet-200 font-semibold hover:bg-violet-500/25 hover:text-white hover:border-violet-400/60 transition-all rounded-xl"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {btnLabel}
+        </Button>
+
+      </div>
 
     </div>
   );
@@ -1125,114 +1169,128 @@ export default function BuilderPage() {
                               duration: '',
                               grade: ''
                             }),
-                          'Add Degree'
+                          'Add Degree',
+                          () => sortSection('education')
                         )}
 
-                        <AnimatePresence>
+                        <DndContext
+                          sensors={dndSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={makeDragEndHandler('education')}
+                        >
+                          <SortableContext
+                            items={data.education.map((e: any) => e.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <AnimatePresence>
 
-                          {data.education.map((edu: any) => (
-                            <motion.div
-                              key={edu.id}
-                              variants={cardVariants}
-                              initial="initial"
-                              animate="animate"
-                              exit="exit"
-                              className={cardCls}
-                            >
+                              {data.education.map((edu: any) => (
+                                <SortableItem key={edu.id} id={edu.id}>
+                                <motion.div
+                                  variants={cardVariants}
+                                  initial="initial"
+                                  animate="animate"
+                                  exit="exit"
+                                  className={cardCls}
+                                >
 
-                              {deleteBtn(() =>
-                                removeArrayItem(
-                                  'education',
-                                  edu.id
-                                )
-                              )}
-
-                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0">
-
-                                {renderInput({
-                                  label: 'Degree / Qualification',
-                                  value: edu.degree,
-                                  onChange: (v) =>
-                                    updateData(
+                                  {deleteBtn(() =>
+                                    removeArrayItem(
                                       'education',
-                                      (p: any) =>
-                                        p.map((i: any) =>
-                                          i.id === edu.id
-                                            ? {
-                                                ...i,
-                                                degree: v
-                                              }
-                                            : i
+                                      edu.id
+                                    )
+                                  )}
+
+                                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-8">
+
+                                    {renderInput({
+                                      label: 'Degree / Qualification',
+                                      value: edu.degree,
+                                      onChange: (v) =>
+                                        updateData(
+                                          'education',
+                                          (p: any) =>
+                                            p.map((i: any) =>
+                                              i.id === edu.id
+                                                ? {
+                                                    ...i,
+                                                    degree: v
+                                                  }
+                                                : i
+                                            )
+                                        ),
+                                      placeholder:
+                                        'Degree / Qualification'
+                                    })}
+
+                                    {renderInput({
+                                      label: 'College / University',
+                                      value: edu.institution,
+                                      onChange: (v) =>
+                                        updateData(
+                                          'education',
+                                          (p: any) =>
+                                            p.map((i: any) =>
+                                              i.id === edu.id
+                                                ? {
+                                                    ...i,
+                                                    institution: v
+                                                  }
+                                                : i
+                                            )
+                                        ),
+                                      placeholder:
+                                        'College / University'
+                                    })}
+
+                                    <MonthYearPicker
+                                      startMonth={edu.startMonth}
+                                      startYear={edu.startYear}
+                                      endMonth={edu.endMonth}
+                                      endYear={edu.endYear}
+                                      allowPresent={true}
+                                      presentLabel="Currently studying here"
+                                      onChange={(fields) =>
+                                        updateData(
+                                          'education',
+                                          (p: any) =>
+                                            p.map((i: any) =>
+                                              i.id === edu.id
+                                                ? { ...i, ...fields }
+                                                : i
+                                            )
                                         )
-                                    ),
-                                  placeholder:
-                                    'Degree / Qualification'
-                                })}
+                                      }
+                                    />
 
-                                {renderInput({
-                                  label: 'College / University',
-                                  value: edu.institution,
-                                  onChange: (v) =>
-                                    updateData(
-                                      'education',
-                                      (p: any) =>
-                                        p.map((i: any) =>
-                                          i.id === edu.id
-                                            ? {
-                                                ...i,
-                                                institution: v
-                                              }
-                                            : i
-                                        )
-                                    ),
-                                  placeholder:
-                                    'College / University'
-                                })}
+                                    {renderInput({
+                                      label: 'Grade / GPA',
+                                      value: edu.grade,
+                                      onChange: (v) =>
+                                        updateData(
+                                          'education',
+                                          (p: any) =>
+                                            p.map((i: any) =>
+                                              i.id === edu.id
+                                                ? {
+                                                    ...i,
+                                                    grade: v
+                                                  }
+                                                : i
+                                            )
+                                        ),
+                                      placeholder: 'Grade / GPA'
+                                    })}
 
-                                {renderInput({
-                                  label: 'Duration',
-                                  value: edu.duration,
-                                  onChange: (v) =>
-                                    updateData(
-                                      'education',
-                                      (p: any) =>
-                                        p.map((i: any) =>
-                                          i.id === edu.id
-                                            ? {
-                                                ...i,
-                                                duration: v
-                                              }
-                                            : i
-                                        )
-                                    ),
-                                  placeholder: 'Duration'
-                                })}
+                                  </div>
 
-                                {renderInput({
-                                  label: 'Grade / GPA',
-                                  value: edu.grade,
-                                  onChange: (v) =>
-                                    updateData(
-                                      'education',
-                                      (p: any) =>
-                                        p.map((i: any) =>
-                                          i.id === edu.id
-                                            ? {
-                                                ...i,
-                                                grade: v
-                                              }
-                                            : i
-                                        )
-                                    ),
-                                  placeholder: 'Grade / GPA'
-                                })}
+                                </motion.div>
+                                </SortableItem>
+                              ))}
 
-                              </div>
-
-                            </motion.div>
-                          ))}
-
-                        </AnimatePresence>
+                            </AnimatePresence>
+                          </SortableContext>
+                        </DndContext>
                       </>
                     )}
 
@@ -1364,131 +1422,144 @@ export default function BuilderPage() {
                               duration: '',
                               responsibilities: ''
                             }),
-                          'Add Job'
+                          'Add Job',
+                          () => sortSection('experience')
                         )}
 
-                        <AnimatePresence>
+                        <DndContext
+                          sensors={dndSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={makeDragEndHandler('experience')}
+                        >
+                          <SortableContext
+                            items={data.experience.map((e: any) => e.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <AnimatePresence>
 
-                          {data.experience.map(
-                            (exp: any) => (
-                              <motion.div
-                                key={exp.id}
-                                variants={cardVariants}
-                                initial="initial"
-                                animate="animate"
-                                exit="exit"
-                                className={cardCls}
-                              >
+                              {data.experience.map(
+                                (exp: any) => (
+                                  <SortableItem key={exp.id} id={exp.id}>
+                                  <motion.div
+                                    variants={cardVariants}
+                                    initial="initial"
+                                    animate="animate"
+                                    exit="exit"
+                                    className={cardCls}
+                                  >
 
-                                {deleteBtn(() =>
-                                  removeArrayItem(
-                                    'experience',
-                                    exp.id
-                                  )
-                                )}
-
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
-
-                                  {renderInput({
-                                    label: 'Job Title',
-                                    value: exp.title,
-                                    onChange: (v) =>
-                                      updateData(
+                                    {deleteBtn(() =>
+                                      removeArrayItem(
                                         'experience',
-                                        (p: any) =>
-                                          p.map(
-                                            (i: any) =>
-                                              i.id ===
-                                              exp.id
-                                                ? {
-                                                    ...i,
-                                                    title: v
-                                                  }
-                                                : i
+                                        exp.id
+                                      )
+                                    )}
+
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-8 mb-4">
+
+                                      {renderInput({
+                                        label: 'Job Title',
+                                        value: exp.title,
+                                        onChange: (v) =>
+                                          updateData(
+                                            'experience',
+                                            (p: any) =>
+                                              p.map(
+                                                (i: any) =>
+                                                  i.id ===
+                                                  exp.id
+                                                    ? {
+                                                        ...i,
+                                                        title: v
+                                                      }
+                                                    : i
+                                              )
+                                          ),
+                                        placeholder:
+                                          'Previous Job Role'
+                                      })}
+
+                                      {renderInput({
+                                        label: 'Company',
+                                        value: exp.company,
+                                        onChange: (v) =>
+                                          updateData(
+                                            'experience',
+                                            (p: any) =>
+                                              p.map(
+                                                (i: any) =>
+                                                  i.id ===
+                                                  exp.id
+                                                    ? {
+                                                        ...i,
+                                                        company: v
+                                                      }
+                                                    : i
+                                              )
+                                          ),
+                                        placeholder:
+                                          'Company name'
+                                      })}
+
+                                      <MonthYearPicker
+                                        startMonth={exp.startMonth}
+                                        startYear={exp.startYear}
+                                        endMonth={exp.endMonth}
+                                        endYear={exp.endYear}
+                                        allowPresent={true}
+                                        presentLabel="I currently work here"
+                                        onChange={(fields) =>
+                                          updateData(
+                                            'experience',
+                                            (p: any) =>
+                                              p.map(
+                                                (i: any) =>
+                                                  i.id === exp.id
+                                                    ? { ...i, ...fields }
+                                                    : i
+                                              )
                                           )
-                                      ),
-                                    placeholder:
-                                      'Previous Job Role'
-                                  })}
+                                        }
+                                      />
 
-                                  {renderInput({
-                                    label: 'Company',
-                                    value: exp.company,
-                                    onChange: (v) =>
-                                      updateData(
-                                        'experience',
-                                        (p: any) =>
-                                          p.map(
-                                            (i: any) =>
-                                              i.id ===
-                                              exp.id
-                                                ? {
-                                                    ...i,
-                                                    company: v
-                                                  }
-                                                : i
-                                          )
-                                      ),
-                                    placeholder:
-                                      'Company name'
-                                  })}
+                                    </div>
 
-                                  {renderInput({
-                                    label: 'Duration',
-                                    value: exp.duration,
-                                    onChange: (v) =>
-                                      updateData(
-                                        'experience',
-                                        (p: any) =>
-                                          p.map(
-                                            (i: any) =>
-                                              i.id ===
-                                              exp.id
-                                                ? {
-                                                    ...i,
-                                                    duration: v
-                                                  }
-                                                : i
-                                          )
-                                      ),
-                                    placeholder: 'Duration'
-                                  })}
+                                    {renderInput({
+                                      label:
+                                        'Responsibilities & Achievements',
+                                      value:
+                                        exp.responsibilities,
+                                      onChange: (v) =>
+                                        updateData(
+                                          'experience',
+                                          (p: any) =>
+                                            p.map(
+                                              (i: any) =>
+                                                i.id === exp.id
+                                                  ? {
+                                                      ...i,
+                                                      responsibilities:
+                                                        v
+                                                    }
+                                                  : i
+                                            )
+                                        ),
+                                      placeholder:
+                                        'Describe key achievements and measurable impact…',
+                                      isTextarea: true,
+                                      section: 'experience',
+                                      id: exp.id,
+                                      field: 'responsibilities'
+                                    })}
 
-                                </div>
+                                  </motion.div>
+                                  </SortableItem>
+                                )
+                              )}
 
-                                {renderInput({
-                                  label:
-                                    'Responsibilities & Achievements',
-                                  value:
-                                    exp.responsibilities,
-                                  onChange: (v) =>
-                                    updateData(
-                                      'experience',
-                                      (p: any) =>
-                                        p.map(
-                                          (i: any) =>
-                                            i.id === exp.id
-                                              ? {
-                                                  ...i,
-                                                  responsibilities:
-                                                    v
-                                                }
-                                              : i
-                                        )
-                                    ),
-                                  placeholder:
-                                    'Describe key achievements and measurable impact…',
-                                  isTextarea: true,
-                                  section: 'experience',
-                                  id: exp.id,
-                                  field: 'responsibilities'
-                                })}
-
-                              </motion.div>
-                            )
-                          )}
-
-                        </AnimatePresence>
+                            </AnimatePresence>
+                          </SortableContext>
+                        </DndContext>
                       </>
                     )}
 
@@ -1527,106 +1598,118 @@ export default function BuilderPage() {
                           'Add Project'
                         )}
 
-                        <AnimatePresence>
+                        <DndContext
+                          sensors={dndSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={makeDragEndHandler('projects')}
+                        >
+                          <SortableContext
+                            items={data.projects.map((p: any) => p.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <AnimatePresence>
 
-                          {data.projects.map(
-                            (proj: any) => (
-                              <motion.div
-                                key={proj.id}
-                                variants={cardVariants}
-                                initial="initial"
-                                animate="animate"
-                                exit="exit"
-                                className={cardCls}
-                              >
+                              {data.projects.map(
+                                (proj: any) => (
+                                  <SortableItem key={proj.id} id={proj.id}>
+                                  <motion.div
+                                    variants={cardVariants}
+                                    initial="initial"
+                                    animate="animate"
+                                    exit="exit"
+                                    className={cardCls}
+                                  >
 
-                                {deleteBtn(() =>
-                                  removeArrayItem(
-                                    'projects',
-                                    proj.id
-                                  )
-                                )}
-
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-0 mb-4">
-
-                                  {renderInput({
-                                    label: 'Project Name',
-                                    value: proj.name,
-                                    onChange: (v) =>
-                                      updateData(
+                                    {deleteBtn(() =>
+                                      removeArrayItem(
                                         'projects',
-                                        (p: any) =>
-                                          p.map(
-                                            (i: any) =>
-                                              i.id ===
-                                              proj.id
-                                                ? {
-                                                    ...i,
-                                                    name: v
-                                                  }
-                                                : i
-                                          )
-                                      ),
-                                    placeholder:
-                                      'Project name'
-                                  })}
+                                        proj.id
+                                      )
+                                    )}
 
-                                  {renderInput({
-                                    label: 'Tech Stack',
-                                    value: proj.stack,
-                                    onChange: (v) =>
-                                      updateData(
-                                        'projects',
-                                        (p: any) =>
-                                          p.map(
-                                            (i: any) =>
-                                              i.id ===
-                                              proj.id
-                                                ? {
-                                                    ...i,
-                                                    stack: v
-                                                  }
-                                                : i
-                                          )
-                                      ),
-                                    placeholder:
-                                      'technology used'
-                                  })}
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-8 sm:pt-8 mb-4">
 
-                                </div>
+                                      {renderInput({
+                                        label: 'Project Name',
+                                        value: proj.name,
+                                        onChange: (v) =>
+                                          updateData(
+                                            'projects',
+                                            (p: any) =>
+                                              p.map(
+                                                (i: any) =>
+                                                  i.id ===
+                                                  proj.id
+                                                    ? {
+                                                        ...i,
+                                                        name: v
+                                                      }
+                                                    : i
+                                              )
+                                          ),
+                                        placeholder:
+                                          'Project name'
+                                      })}
 
-                                {renderInput({
-                                  label:
-                                    'Description & Impact',
-                                  value:
-                                    proj.description,
-                                  onChange: (v) =>
-                                    updateData(
-                                      'projects',
-                                      (p: any) =>
-                                        p.map(
-                                          (i: any) =>
-                                            i.id === proj.id
-                                              ? {
-                                                  ...i,
-                                                  description: v
-                                                }
-                                              : i
-                                        )
-                                    ),
-                                  placeholder:
-                                    'What problem did you solve? What was the outcome?',
-                                  isTextarea: true,
-                                  section: 'projects',
-                                  id: proj.id,
-                                  field: 'description'
-                                })}
+                                      {renderInput({
+                                        label: 'Tech Stack',
+                                        value: proj.stack,
+                                        onChange: (v) =>
+                                          updateData(
+                                            'projects',
+                                            (p: any) =>
+                                              p.map(
+                                                (i: any) =>
+                                                  i.id ===
+                                                  proj.id
+                                                    ? {
+                                                        ...i,
+                                                        stack: v
+                                                      }
+                                                    : i
+                                              )
+                                          ),
+                                        placeholder:
+                                          'technology used'
+                                      })}
 
-                              </motion.div>
-                            )
-                          )}
+                                    </div>
 
-                        </AnimatePresence>
+                                    {renderInput({
+                                      label:
+                                        'Description & Impact',
+                                      value:
+                                        proj.description,
+                                      onChange: (v) =>
+                                        updateData(
+                                          'projects',
+                                          (p: any) =>
+                                            p.map(
+                                              (i: any) =>
+                                                i.id === proj.id
+                                                  ? {
+                                                      ...i,
+                                                      description: v
+                                                    }
+                                                  : i
+                                            )
+                                        ),
+                                      placeholder:
+                                        'What problem did you solve? What was the outcome?',
+                                      isTextarea: true,
+                                      section: 'projects',
+                                      id: proj.id,
+                                      field: 'description'
+                                    })}
+
+                                  </motion.div>
+                                  </SortableItem>
+                                )
+                              )}
+
+                            </AnimatePresence>
+                          </SortableContext>
+                        </DndContext>
                       </>
                     )}
 
