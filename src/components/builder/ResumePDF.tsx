@@ -1,6 +1,7 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
 import { ResumeData } from './ResumeContext';
+import { sortChronologically } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -65,7 +66,9 @@ const formatTags = (tags: string) => (tags ? tags.split(',').join(' | ') : '');
 
 const getMonthName = (monthNumber?: string) => {
   if (!monthNumber) return '';
-  const date = new Date(2000, parseInt(monthNumber) - 1, 1);
+  const parsed = parseInt(monthNumber, 10);
+  if (isNaN(parsed) || parsed < 1 || parsed > 12) return ''; // guards bad/non-numeric input instead of rendering "Invalid Date"
+  const date = new Date(2000, parsed - 1, 1);
   return date.toLocaleString('en-US', { month: 'short' }); 
 };
 
@@ -115,10 +118,15 @@ export const ResumePDF = ({ data }: { data: ResumeData }) => (
       {data.experience.length > 0 && (
         <View>
           <Text style={styles.sectionTitle}>Experience</Text>
-          {data.experience.map((exp) => (
+          {/* Experience is always shown newest-first in the final PDF,
+              regardless of the drag order set in the builder — that order
+              only controls the editing view. */}
+          {sortChronologically(data.experience).filter((exp) => exp.title?.trim() || exp.company?.trim()).map((exp) => (
             <View key={exp.id} style={styles.itemContainer}>
               <View style={styles.itemHeader}>
-                <Text style={styles.title}>{exp.title} at {exp.company}</Text>
+                <Text style={styles.title}>
+                  {exp.title}{exp.title && exp.company ? ' at ' : ''}{exp.company}
+                </Text>
                 <Text style={styles.date}>
                   {exp.startMonth ? getMonthName(exp.startMonth) : ''} {exp.startYear ? exp.startYear : ''} 
                   {(exp.startMonth || exp.startYear) && (exp.endMonth || exp.endYear) ? ' - ' : ''}
@@ -156,7 +164,9 @@ export const ResumePDF = ({ data }: { data: ResumeData }) => (
       {data.education.length > 0 && (
         <View>
           <Text style={styles.sectionTitle}>Education</Text>
-          {data.education.map((edu) => (
+          {/* Same as Experience above — always chronological in the final
+              PDF regardless of builder drag order. */}
+          {sortChronologically(data.education).map((edu) => (
             <View key={edu.id} style={styles.itemContainer}>
               <View style={styles.itemHeader}>
                 <Text style={styles.title}>{edu.institution}</Text>
