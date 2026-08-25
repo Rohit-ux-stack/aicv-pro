@@ -28,9 +28,15 @@ export async function POST(req: Request) {
       ${JSON.stringify(resumeData)}
     `;
 
+    // Reasoning off — a chain-of-thought preamble here would land inside
+    // the JSON response and break json_object parsing (same failure mode
+    // seen in parse/route.ts), plus it adds latency for no benefit.
     const result = await nemotron.chat.completions.create({
       model: "nvidia/llama-3.3-nemotron-super-49b-v1",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: "detailed thinking off" },
+        { role: "user", content: prompt }
+      ],
       temperature: 0.2, // Very low temperature so it doesn't break the JSON structure
       response_format: { type: "json_object" } // Forces Nemotron to output clean JSON
     });
