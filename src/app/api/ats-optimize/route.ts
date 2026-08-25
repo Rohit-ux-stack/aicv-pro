@@ -14,7 +14,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: "You are an ATS Resume Optimizer. Rewrite the user's sentence to replace weak words with strong action verbs. Use strictly professional HR language. Return ONLY the rewritten sentence."
+            content: "detailed thinking off\n\nYou are an ATS Resume Optimizer. Rewrite the user's sentence to replace weak words with strong action verbs. Use strictly professional HR language. Return ONLY the rewritten sentence."
           },
           { role: "user", content: text }
         ]
