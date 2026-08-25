@@ -257,6 +257,37 @@ For multiple bullet points inside experience, combine them into one string using
 For multiple skills, combine them using " | ".
 
 Preserve the original meaning and factual information.
+
+Copy every word, name, and list item EXACTLY as it is spelled and spaced in the
+source text — character for character. This especially applies to short
+alphanumeric tokens (e.g. "3d", "iOS15", "Node.js") and hobbies/skills/tools
+lists: never split a word apart, insert a space inside a token, or "correct"
+spelling/spacing that looks unusual. If in doubt, copy the exact substring
+rather than retyping it from memory.
+
+FIELD-SPECIFIC RULES:
+
+- personalInfo.website: this field is reused for the short role/title line that
+  often appears directly under the candidate's name (e.g. "Front-End Developer |
+  UI/UX Designer | Project Manager | Editor"). If such a line exists, put it here,
+  formatted as comma-separated tags (e.g. "Front-End Developer,UI/UX Designer").
+  Only put an actual website/portfolio URL here if there is no role/title line
+  AND a real website URL is present in the resume.
+
+- startMonth / endMonth (in both "experience" and "education"): these must ALWAYS
+  be a two-digit numeric string from "01" to "12" (e.g. "03" for March). NEVER
+  return a month name like "March" or "Mar". If the resume's date range only
+  states years with no month (e.g. "2023 - 2026"), leave startMonth and endMonth
+  as empty strings "" — do NOT invent or guess a month. If the role is current/
+  ongoing, set endYear to "Present" and leave endMonth as "".
+
+- experience: only include entries that are actual jobs, internships, or
+  employment roles with both a title and a company. Never emit an experience
+  entry where title and company are both empty — if a line doesn't clearly
+  belong to an employment role, leave it out entirely rather than creating a
+  placeholder entry. Do not confuse the "PROJECTS" section with "EXPERIENCE" —
+  personal/academic projects belong only in the "projects" array, never in
+  "experience".
 `;
 
 async function parseResumeText(text: string) {
@@ -280,7 +311,7 @@ async function parseResumeText(text: string) {
       temperature: 0,
       // Sized to fit under the provider's TPM on-demand limit (prompt + completion
       // combined), while still allowing long resumes a large enough response.
-      max_completion_tokens: completionBudget(promptForBudget, 8000, 1024, 6000),
+      max_tokens: completionBudget(promptForBudget, 8000, 1024, 6000),
       response_format: {
         type: "json_schema",
         json_schema: {
@@ -299,7 +330,7 @@ async function parseResumeText(text: string) {
     } as any);
 
     const content = completion.choices[0]?.message?.content;
-    return safeJsonParse(content, "Nemotron resume parser (json_schema mode)");
+    return sanitizeResumeData(safeJsonParse(content, "Nemotron resume parser (json_schema mode)"));
   } catch (schemaError) {
     if (isRateLimitError(schemaError)) {
       throw new Error(
@@ -332,14 +363,50 @@ async function parseResumeText(text: string) {
         }
       ],
       temperature: 0,
-      max_completion_tokens: completionBudget(fallbackPromptForBudget, 8000, 1024, 6000),
+      max_tokens: completionBudget(fallbackPromptForBudget, 8000, 1024, 6000),
       response_format: { type: "json_object" },
       chat_template_kwargs: { enable_thinking: false }
     } as any);
 
     const rawContent = completion.choices[0]?.message?.content;
-    return safeJsonParse(rawContent, "Nemotron resume parser (json_object fallback)");
+    return sanitizeResumeData(safeJsonParse(rawContent, "Nemotron resume parser (json_object fallback)"));
   }
+}
+
+// Safety net independent of prompt-following: drops any experience/education
+// entries the model returned where the core identifying fields are all blank
+// (e.g. a stray entry at a section boundary), and coerces month fields that
+// aren't clean "01"-"12" numeric strings to "" instead of passing bad data
+// through to the frontend's date formatting.
+function sanitizeResumeData(data: any) {
+  if (!data || typeof data !== "object") return data;
+
+  const cleanMonth = (m: any) => {
+    const s = typeof m === "string" ? m.trim() : "";
+    return /^(0?[1-9]|1[0-2])$/.test(s) ? s.padStart(2, "0") : "";
+  };
+
+  if (Array.isArray(data.experience)) {
+    data.experience = data.experience
+      .filter((exp: any) => (exp?.title?.trim() || exp?.company?.trim()))
+      .map((exp: any) => ({
+        ...exp,
+        startMonth: cleanMonth(exp.startMonth),
+        endMonth: cleanMonth(exp.endMonth)
+      }));
+  }
+
+  if (Array.isArray(data.education)) {
+    data.education = data.education
+      .filter((edu: any) => (edu?.degree?.trim() || edu?.institution?.trim()))
+      .map((edu: any) => ({
+        ...edu,
+        startMonth: cleanMonth(edu.startMonth),
+        endMonth: cleanMonth(edu.endMonth)
+      }));
+  }
+
+  return data;
 }
 
 async function extractTextFromImages(images: string[]) {
@@ -391,7 +458,7 @@ Do not invent information.
       temperature: 0,
       // Images already consume a large token budget on this model; cap the
       // completion request instead of blindly asking for the max every time.
-      max_completion_tokens: completionBudget(ocrInstruction, 8000, 2048, 6000),
+      max_tokens: completionBudget(ocrInstruction, 8000, 2048, 6000),
       response_format: {
         type: "json_object"
       },
@@ -401,6 +468,16 @@ Do not invent information.
     } as any);
 
     const content = completion.choices[0]?.message?.content;
+
+    // DEBUG: temporary — helps confirm whether the model is actually grounding
+    // on the image content or hallucinating a generic resume. Check server logs
+    // after a test upload: if reasoning/content describes THIS resume, the image
+    // is reaching the model; if it's generic/unrelated, the image isn't landing
+    // (encoding, size limit, or param issue upstream). Remove once confirmed fixed.
+    console.log("NEMOTRON OCR DEBUG — batch size:", batch.length);
+    console.log("NEMOTRON OCR DEBUG — reasoning_content:", (completion.choices[0]?.message as any)?.reasoning_content?.slice?.(0, 500));
+    console.log("NEMOTRON OCR DEBUG — raw content:", content?.slice(0, 500));
+
     const pageResult = safeJsonParse(content, "Nemotron OCR");
 
     if (pageResult.text) {
