@@ -8,8 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 export const parseDateValue = (month: string, year: string) => {
   if (!year) return 0;
   if (year.toLowerCase() === 'present') return Infinity; // Keeps current jobs at the top
-  const monthVal = month ? parseInt(month) : 1; 
-  return parseInt(year) * 12 + monthVal; 
+  const parsedMonth = month ? parseInt(month) : NaN;
+  const monthVal = !isNaN(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12 ? parsedMonth : 1; // guards non-numeric month strings from producing NaN sort keys
+  const parsedYear = parseInt(year);
+  return isNaN(parsedYear) ? 0 : parsedYear * 12 + monthVal;
 };
 
 export const sortChronologically = (items: any[]) => {
