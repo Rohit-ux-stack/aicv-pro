@@ -47,10 +47,14 @@ export async function POST(req: Request) {
       ${JSON.stringify(data)}
     `;
 
-    // 5. Call Nemotron
+    // 5. Call Nemotron (reasoning off — this task doesn't need chain-of-thought,
+    // and leaving it on adds real latency for no quality benefit here)
     const result = await nemotron.chat.completions.create({
       model: "nvidia/llama-3.3-nemotron-super-49b-v1",
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        { role: "system", content: "detailed thinking off" },
+        { role: "user", content: prompt }
+      ],
       temperature: 0.7, // Increased from 0.4 to 0.7 to allow for more vocabulary variation while obeying the strict rules
     });
 
