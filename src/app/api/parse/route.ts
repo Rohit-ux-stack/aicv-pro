@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 import OpenAI from 'openai';
 
-// Groq client — used STRICTLY for text-based (readable) PDFs.
-// This matches ai-write, ats-optimize and full-optimize, which all
-// already call Groq natively with the same GROQ_API_KEY.
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
-// OpenRouter client — used STRICTLY for OCR on image/scanned PDFs.
-// Groq does not host the Nemotron vision model, so OCR keeps going
-// through OpenRouter. Text parsing no longer touches this client.
-const openRouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: 'https://openrouter.ai/api/v1',
+// NVIDIA build.nvidia.com — OpenAI-compatible endpoint, used for BOTH
+// text-PDF parsing (nemotron-super, text-only) and OCR on image/scanned
+// PDFs (nemotron-3-nano-omni, vision-capable). Same client, same key —
+// this matches ai-write, ats-optimize and full-optimize, which all
+// already call NVIDIA natively with NVIDIA_API_KEY.
+const nemotron = new OpenAI({
+  apiKey: process.env.NVIDIA_API_KEY,
+  baseURL: 'https://integrate.api.nvidia.com/v1',
 });
 
 // Safely parses a model's JSON response. Handles empty strings, truncated
@@ -37,16 +33,16 @@ function safeJsonParse(raw: string | undefined | null, context: string) {
 }
 
 // Rough token estimator (no tokenizer dependency): ~4 chars per token is a
-// safe-enough approximation for budgeting against Groq's TPM limit.
+// safe-enough approximation for budgeting against the provider's TPM limit.
 function estimateTokens(str: string): number {
   return Math.ceil(str.length / 4);
 }
 
-// Groq's on-demand tier TPM limit counts prompt tokens + max_completion_tokens
-// together (not just what's actually generated). Sending a fixed 8192 every
-// time was blowing past the 8000 TPM cap on short requests. This clamps the
-// completion budget so prompt + completion always stays under the limit,
-// while leaving room for genuinely long resumes to still get a full response.
+// Free/on-demand NVIDIA NIM tiers can also cap tokens per minute. Sending a
+// fixed large completion budget every time can blow past that cap on short
+// requests. This clamps the completion budget so prompt + completion always
+// stays under the limit, while leaving room for genuinely long resumes to
+// still get a full response.
 function completionBudget(promptText: string, cap: number, floor: number, ceiling: number): number {
   const promptTokens = estimateTokens(promptText);
   const safetyMargin = 200; // leave headroom for tokenizer estimation error
@@ -54,8 +50,8 @@ function completionBudget(promptText: string, cap: number, floor: number, ceilin
   return Math.max(floor, Math.min(ceiling, available));
 }
 
-// Friendlier message when Groq's TPM rate limit is hit, instead of a raw
-// 413/429 JSON blob bubbling up to the user.
+// Friendlier message when the provider's TPM rate limit is hit, instead of a
+// raw 413/429 JSON blob bubbling up to the user.
 function isRateLimitError(err: any): boolean {
   const status = err?.status;
   const message = String(err?.message || "");
@@ -263,13 +259,13 @@ Preserve the original meaning and factual information.
 `;
 
 async function parseResumeText(text: string) {
-  // STRICTLY Groq — readable/text PDFs never touch OpenRouter or Nemotron.
+  // Text-based (readable) PDFs — uses the text-only Nemotron model.
   const userMessage = `Extract the following resume into the required structure:\n\n${text}`;
   const promptForBudget = SYSTEM_PROMPT + userMessage;
 
   try {
-    const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+    const completion = await nemotron.chat.completions.create({
+      model: "nvidia/llama-3.3-nemotron-super-49b-v1",
       messages: [
         {
           role: "system",
@@ -281,7 +277,7 @@ async function parseResumeText(text: string) {
         }
       ],
       temperature: 0,
-      // Sized to fit under Groq's 8000 TPM on-demand limit (prompt + completion
+      // Sized to fit under the provider's TPM on-demand limit (prompt + completion
       // combined), while still allowing long resumes a large enough response.
       max_completion_tokens: completionBudget(promptForBudget, 8000, 1024, 6000),
       response_format: {
@@ -295,11 +291,11 @@ async function parseResumeText(text: string) {
     });
 
     const content = completion.choices[0]?.message?.content;
-    return safeJsonParse(content, "Groq resume parser (json_schema mode)");
+    return safeJsonParse(content, "Nemotron resume parser (json_schema mode)");
   } catch (schemaError) {
     if (isRateLimitError(schemaError)) {
       throw new Error(
-        "Your resume text is too large for the current Groq plan's rate limit. Try shortening it, splitting it up, or upgrading your Groq tier."
+        "Your resume text is too large for the current NVIDIA API rate limit. Try shortening it, splitting it up, or upgrading your NVIDIA tier."
       );
     }
 
@@ -310,13 +306,13 @@ async function parseResumeText(text: string) {
     // that alone was often larger than the resume itself and was a major
     // contributor to hitting the TPM limit. A short instruction is enough
     // since the model already saw the required fields via SYSTEM_PROMPT.
-    console.warn("Groq json_schema mode failed, falling back to json_object:", schemaError);
+    console.warn("Nemotron json_schema mode failed, falling back to json_object:", schemaError);
 
     const fallbackSystemPrompt = `${SYSTEM_PROMPT}\n\nReturn STRICTLY valid JSON only — no markdown fences, no extra text — with these top-level keys: personalInfo, education, skills, experience, projects, extras.`;
     const fallbackPromptForBudget = fallbackSystemPrompt + userMessage;
 
-    const completion = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+    const completion = await nemotron.chat.completions.create({
+      model: "nvidia/llama-3.3-nemotron-super-49b-v1",
       messages: [
         {
           role: "system",
@@ -333,12 +329,13 @@ async function parseResumeText(text: string) {
     });
 
     const rawContent = completion.choices[0]?.message?.content;
-    return safeJsonParse(rawContent, "Groq resume parser (json_object fallback)");
+    return safeJsonParse(rawContent, "Nemotron resume parser (json_object fallback)");
   }
 }
 
 async function extractTextFromImages(images: string[]) {
-  // STRICTLY OpenRouter + Nemotron — scanned/image PDFs never touch Groq.
+  // Scanned/image PDFs — uses the vision-capable Nemotron Omni model,
+  // now called directly on build.nvidia.com (same client as text parsing).
   const extractedPages: string[] = [];
 
   for (let i = 0; i < images.length; i += 5) {
@@ -368,8 +365,8 @@ Do not summarize.
 Do not invent information.
               `;
 
-    const completion = await openRouter.chat.completions.create({
-      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    const completion = await nemotron.chat.completions.create({
+      model: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
       messages: [
         {
           role: "user",
@@ -416,26 +413,26 @@ export async function POST(req: Request) {
 
     let resumeText = "";
 
-    // TEXT PDF — strictly Groq
+    // TEXT PDF — Nemotron (text-only)
     if (body.type === "text" && body.text?.trim()) {
-      if (!process.env.GROQ_API_KEY) {
+      if (!process.env.NVIDIA_API_KEY) {
         return NextResponse.json(
-          { error: "GROQ_API_KEY is missing in environment variables" },
+          { error: "NVIDIA_API_KEY is missing in environment variables" },
           { status: 500 }
         );
       }
       resumeText = body.text.trim();
     }
 
-    // IMAGE / SCANNED PDF — strictly OpenRouter + Nemotron (OCR)
+    // IMAGE / SCANNED PDF — Nemotron Omni (vision, OCR)
     else if (
       body.type === "image" &&
       Array.isArray(body.images) &&
       body.images.length > 0
     ) {
-      if (!process.env.OPENROUTER_API_KEY) {
+      if (!process.env.NVIDIA_API_KEY) {
         return NextResponse.json(
-          { error: "OPENROUTER_API_KEY is missing in environment variables" },
+          { error: "NVIDIA_API_KEY is missing in environment variables" },
           { status: 500 }
         );
       }
@@ -467,7 +464,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "The AI provider's rate limit was hit for this request. Try again with a shorter resume, wait a minute, or upgrade your Groq/OpenRouter tier."
+            "The AI provider's rate limit was hit for this request. Try again with a shorter resume, wait a minute, or upgrade your NVIDIA API tier."
         },
         { status: 429 }
       );
