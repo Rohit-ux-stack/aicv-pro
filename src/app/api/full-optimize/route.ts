@@ -1,7 +1,11 @@
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// NVIDIA build.nvidia.com — OpenAI-compatible endpoint.
+const nemotron = new OpenAI({
+  apiKey: process.env.NVIDIA_API_KEY,
+  baseURL: 'https://integrate.api.nvidia.com/v1',
+});
 
 export async function POST(req: Request) {
   try {
@@ -24,11 +28,11 @@ export async function POST(req: Request) {
       ${JSON.stringify(resumeData)}
     `;
 
-    const result = await groq.chat.completions.create({
-      model: "openai/gpt-oss-120b",
+    const result = await nemotron.chat.completions.create({
+      model: "nvidia/llama-3.3-nemotron-super-49b-v1",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2, // Very low temperature so it doesn't break the JSON structure
-      response_format: { type: "json_object" } // Forces Groq to output clean JSON
+      response_format: { type: "json_object" } // Forces Nemotron to output clean JSON
     });
 
     const rawContent = result.choices[0].message.content || '{}';
