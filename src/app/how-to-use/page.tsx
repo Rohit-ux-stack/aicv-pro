@@ -182,6 +182,18 @@ export default function HowToUsePage() {
             <span className="group-hover:underline underline-offset-2">github.com/Rohit-ux-stack</span>
           </a>
         </div>
+        <p className="mt-4 text-[11px] font-medium text-violet-400/45">
+          Built by{' '}
+          <a
+            href="https://github.com/Rohit-ux-stack"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-violet-300/80 hover:text-violet-200 hover:underline underline-offset-2 transition-colors"
+          >
+            Rohit Banerjee
+          </a>
+        </p>
+
       </motion.footer>
     </div>
   );
